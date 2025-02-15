@@ -9,30 +9,47 @@ interface GeneratedMeditation {
 }
 
 export async function generateMeditation(prompt: string): Promise<GeneratedMeditation> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: "You are a meditation guide specialized in creating calming, personalized meditations. Generate a meditation script that includes breathing instructions and visualization. Format the response as JSON with 'content' (the meditation script) and 'duration' (estimated duration in seconds)."
-      },
-      {
-        role: "user",
-        content: prompt
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are a meditation guide specialized in creating calming, personalized meditations.
+Generate a meditation script that includes breathing instructions and visualization.
+The response MUST be a valid JSON object with exactly these fields:
+{
+  "content": "the meditation script as a string",
+  "duration": estimated duration in seconds (number)
+}`
+        },
+        {
+          role: "user",
+          content: `Generate a calming meditation focused on: ${prompt}`
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("No content received from OpenAI");
+    }
+
+    try {
+      const parsed = JSON.parse(content);
+      if (typeof parsed.content !== 'string' || typeof parsed.duration !== 'number') {
+        throw new Error("Invalid response format");
       }
-    ],
-    response_format: { type: "json_object" }
-  });
-
-  // Parse and validate the response
-  const content = response.choices[0].message.content;
-  if (!content) {
-    throw new Error("Failed to generate meditation content");
+      return {
+        content: parsed.content,
+        duration: parsed.duration
+      };
+    } catch (e) {
+      throw new Error(`Failed to parse OpenAI response: ${e.message}`);
+    }
+  } catch (error) {
+    console.error('OpenAI API Error:', error);
+    throw new Error("Failed to generate meditation. Please try again.");
   }
-
-  const parsed = JSON.parse(content);
-  return {
-    content: parsed.content,
-    duration: parsed.duration
-  };
 }
