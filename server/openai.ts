@@ -24,5 +24,15 @@ export async function generateMeditation(prompt: string): Promise<GeneratedMedit
     response_format: { type: "json_object" }
   });
 
-  return JSON.parse(response.choices[0].message.content);
+  // Parse and validate the response
+  const content = response.choices[0].message.content;
+  if (!content) {
+    throw new Error("Failed to generate meditation content");
+  }
+
+  const parsed = JSON.parse(content);
+  return {
+    content: parsed.content,
+    duration: parsed.duration
+  };
 }
