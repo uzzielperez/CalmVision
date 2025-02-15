@@ -1,21 +1,49 @@
 import { useState, useCallback, useEffect } from "react";
 
+interface VoiceWithAccent extends SpeechSynthesisVoice {
+  accent?: string;
+}
+
 export function useSpeech() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [utterance, setUtterance] = useState<SpeechSynthesisUtterance>();
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [voices, setVoices] = useState<VoiceWithAccent[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<VoiceWithAccent | null>(null);
 
   useEffect(() => {
     function loadVoices() {
       const availableVoices = speechSynthesis.getVoices();
-      setVoices(availableVoices);
 
-      // Try to find a soothing voice as default
-      const defaultVoice = availableVoices.find(voice => 
+      // Process voices to identify accents
+      const processedVoices = availableVoices.map(voice => {
+        const voiceWithAccent: VoiceWithAccent = voice;
+        const name = voice.name.toLowerCase();
+
+        if (name.includes('british') || name.includes('uk')) {
+          voiceWithAccent.accent = 'British';
+        } else if (name.includes('irish')) {
+          voiceWithAccent.accent = 'Irish';
+        } else if (name.includes('australian') || name.includes('au')) {
+          voiceWithAccent.accent = 'Australian';
+        } else if (name.includes('scottish') || name.includes('scotland')) {
+          voiceWithAccent.accent = 'Scottish';
+        }
+
+        return voiceWithAccent;
+      });
+
+      setVoices(processedVoices);
+
+      // Try to find a preferred accent voice as default
+      const defaultVoice = processedVoices.find(voice => 
+        voice.accent === 'British' || 
+        voice.accent === 'Irish' ||
+        voice.accent === 'Australian' ||
+        voice.accent === 'Scottish'
+      ) || processedVoices.find(voice => 
         voice.name.toLowerCase().includes('female') || 
         voice.name.toLowerCase().includes('samantha')
-      ) || availableVoices[0];
+      ) || processedVoices[0];
 
       setSelectedVoice(defaultVoice);
     }

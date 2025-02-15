@@ -15,6 +15,34 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
+// Group voices by accent
+function groupVoicesByAccent(voices: SpeechSynthesisVoice[]) {
+  const groups: { [key: string]: SpeechSynthesisVoice[] } = {
+    'British Accent': [],
+    'Irish Accent': [],
+    'Australian Accent': [],
+    'Scottish Accent': [],
+    'Other Voices': []
+  };
+
+  voices.forEach(voice => {
+    const name = voice.name.toLowerCase();
+    if (name.includes('british') || name.includes('uk')) {
+      groups['British Accent'].push(voice);
+    } else if (name.includes('irish')) {
+      groups['Irish Accent'].push(voice);
+    } else if (name.includes('australian') || name.includes('au')) {
+      groups['Australian Accent'].push(voice);
+    } else if (name.includes('scottish') || name.includes('scotland')) {
+      groups['Scottish Accent'].push(voice);
+    } else {
+      groups['Other Voices'].push(voice);
+    }
+  });
+
+  return Object.entries(groups).filter(([_, voices]) => voices.length > 0);
+}
+
 interface VoiceSelectorProps {
   voices: SpeechSynthesisVoice[];
   selectedVoice: SpeechSynthesisVoice | null;
@@ -23,6 +51,7 @@ interface VoiceSelectorProps {
 
 export function VoiceSelector({ voices, selectedVoice, onVoiceChange }: VoiceSelectorProps) {
   const [open, setOpen] = React.useState(false);
+  const groupedVoices = groupVoicesByAccent(voices);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -41,25 +70,33 @@ export function VoiceSelector({ voices, selectedVoice, onVoiceChange }: VoiceSel
         <Command>
           <CommandInput placeholder="Search voices..." />
           <CommandEmpty>No voice found.</CommandEmpty>
-          <CommandGroup>
-            {voices.map((voice) => (
-              <CommandItem
-                key={voice.name}
-                onSelect={() => {
-                  onVoiceChange(voice);
-                  setOpen(false);
-                }}
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    selectedVoice?.name === voice.name ? "opacity-100" : "opacity-0"
-                  )}
-                />
-                {voice.name}
-              </CommandItem>
-            ))}
-          </CommandGroup>
+          {groupedVoices.map(([group, voices]) => (
+            <CommandGroup key={group} heading={group}>
+              {voices.map((voice) => (
+                <CommandItem
+                  key={voice.name}
+                  onSelect={() => {
+                    onVoiceChange(voice);
+                    setOpen(false);
+                  }}
+                  className="flex items-center"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedVoice?.name === voice.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <div>
+                    <div>{voice.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {voice.lang} - {voice.localService ? "Local" : "Network"}
+                    </div>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
         </Command>
       </PopoverContent>
     </Popover>
