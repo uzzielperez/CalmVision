@@ -57,32 +57,48 @@ export function useSpeech() {
   }, []);
 
   const speak = useCallback((text: string) => {
-    const newUtterance = new SpeechSynthesisUtterance(text);
+    const sentences = text
+      .replace(/\.\s+/g, '.|')  // Split on periods
+      .replace(/\?\s+/g, '?|')  // Split on question marks
+      .replace(/!\s+/g, '!|')   // Split on exclamation marks
+      .split('|')               // Split into array
+      .filter(sentence => sentence.trim().length > 0);
 
-    if (selectedVoice) {
-      newUtterance.voice = selectedVoice;
+    let currentIndex = 0;
+
+    function speakNextSentence() {
+      if (currentIndex < sentences.length) {
+        const newUtterance = new SpeechSynthesisUtterance(sentences[currentIndex]);
+
+        if (selectedVoice) {
+          newUtterance.voice = selectedVoice;
+        }
+
+        // Adjust speech parameters for a more calming, relaxed effect
+        newUtterance.rate = 0.7;  // Slower for meditation
+        newUtterance.pitch = 0.9; // Slightly lower pitch for a calmer tone
+        newUtterance.volume = 0.8;
+
+        newUtterance.onend = () => {
+          currentIndex++;
+          // Add a pause between sentences
+          setTimeout(speakNextSentence, 800);
+        };
+
+        newUtterance.onstart = () => setIsPlaying(true);
+        newUtterance.onpause = () => setIsPlaying(false);
+        newUtterance.onresume = () => setIsPlaying(true);
+
+        setUtterance(newUtterance);
+        speechSynthesis.speak(newUtterance);
+      } else {
+        setIsPlaying(false);
+      }
     }
 
-    // Adjust speech parameters for a more calming, relaxed effect
-    newUtterance.rate = 0.7;  // Even slower for meditation
-    newUtterance.pitch = 0.9; // Slightly lower pitch for a calmer tone
-    newUtterance.volume = 0.8; // Slightly softer
-
-    // Add pauses between sentences
-    const textWithPauses = text
-      .replace(/\./g, '... <break time="1.5s"/>') // Longer pause after sentences
-      .replace(/,/g, ', <break time="0.7s"/>') // Medium pause after commas
-      .replace(/\n/g, '\n<break time="2s"/>'); // Extra long pause between paragraphs
-
-    newUtterance.text = textWithPauses;
-
-    newUtterance.onstart = () => setIsPlaying(true);
-    newUtterance.onend = () => setIsPlaying(false);
-    newUtterance.onpause = () => setIsPlaying(false);
-    newUtterance.onresume = () => setIsPlaying(true);
-
-    setUtterance(newUtterance);
-    speechSynthesis.speak(newUtterance);
+    // Start speaking
+    stop(); // Stop any current speech
+    speakNextSentence();
     setIsPlaying(true);
   }, [selectedVoice]);
 

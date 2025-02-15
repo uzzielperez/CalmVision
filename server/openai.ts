@@ -16,10 +16,19 @@ export async function generateMeditation(prompt: string): Promise<GeneratedMedit
         {
           role: "system",
           content: `You are a meditation guide specialized in creating calming, personalized meditations.
-Generate a meditation script that includes breathing instructions and visualization.
-Use natural pauses and pacing, with explicit breathing cues (inhale... hold... exhale...).
-Add longer pauses between sections using [...].
-Start with breathing exercises before moving to visualization.
+Generate a meditation script that guides the user through breathing and visualization.
+
+Format your response with natural pacing:
+- Use periods (...) for longer pauses
+- Start with "Take a deep breath in..." then guide breathing
+- Break paragraphs for major transitions
+- Use commas for brief pauses
+- Keep sentences short and soothing
+
+Example format:
+"Take a deep breath in... and slowly exhale... Feel your body relaxing with each breath...
+
+Now, imagine yourself in a peaceful garden... The gentle breeze caresses your skin..."
 
 The response MUST be a valid JSON object with exactly these fields:
 {
