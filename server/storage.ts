@@ -1,38 +1,53 @@
-import { meditations, type Meditation, type InsertMeditation } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import { meditations, type Meditation, type InsertMeditation, type UpdateMeditation } from "@shared/schema";
 
 export interface IStorage {
   createMeditation(meditation: InsertMeditation): Promise<Meditation>;
   getMeditation(id: number): Promise<Meditation | undefined>;
   listMeditations(): Promise<Meditation[]>;
+  rateMeditation(id: number, rating: number): Promise<Meditation>;
+  deleteMeditation(id: number): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private meditations: Map<number, Meditation>;
-  private currentId: number;
-
-  constructor() {
-    this.meditations = new Map();
-    this.currentId = 1;
-  }
-
-  async createMeditation(meditation: InsertMeditation): Promise<Meditation> {
-    const id = this.currentId++;
-    const newMeditation: Meditation = {
-      ...meditation,
-      id,
-      createdAt: new Date(),
-    };
-    this.meditations.set(id, newMeditation);
+export class DatabaseStorage implements IStorage {
+  async createMeditation(meditation: InsertMeditation & { content: string }): Promise<Meditation> {
+    const [newMeditation] = await db
+      .insert(meditations)
+      .values(meditation)
+      .returning();
     return newMeditation;
   }
 
   async getMeditation(id: number): Promise<Meditation | undefined> {
-    return this.meditations.get(id);
+    const [meditation] = await db
+      .select()
+      .from(meditations)
+      .where(eq(meditations.id, id));
+    return meditation;
   }
 
   async listMeditations(): Promise<Meditation[]> {
-    return Array.from(this.meditations.values());
+    return db
+      .select()
+      .from(meditations)
+      .orderBy(meditations.createdAt);
+  }
+
+  async rateMeditation(id: number, rating: number): Promise<Meditation> {
+    const [updated] = await db
+      .update(meditations)
+      .set({ rating })
+      .where(eq(meditations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteMeditation(id: number): Promise<void> {
+    await db
+      .delete(meditations)
+      .where(eq(meditations.id, id));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

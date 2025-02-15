@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { History } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,13 +36,20 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
       <Card className="w-full max-w-lg">
         <CardContent className="pt-6 space-y-6">
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-4xl font-bold text-center bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent"
-          >
-            Mindful Moments
-          </motion.h1>
+          <div className="flex items-center justify-between">
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent"
+            >
+              Mindful Moments
+            </motion.h1>
+            <Button variant="outline" size="icon" asChild>
+              <Link href="/history">
+                <History className="h-5 w-5" />
+              </Link>
+            </Button>
+          </div>
 
           <p className="text-center text-muted-foreground">
             Enter your intention or desired focus for meditation

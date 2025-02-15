@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer } from "http";
 import { storage } from "./storage";
 import { generateMeditation } from "./openai";
-import { insertMeditationSchema } from "@shared/schema";
+import { insertMeditationSchema, updateMeditationSchema } from "@shared/schema";
 import { ZodError } from "zod";
 
 export async function registerRoutes(app: Express) {
@@ -43,6 +43,16 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/meditations", async (_req, res) => {
+    try {
+      const meditations = await storage.listMeditations();
+      res.json(meditations);
+    } catch (error) {
+      console.error('Failed to list meditations:', error);
+      res.status(500).json({ error: "Failed to list meditations" });
+    }
+  });
+
   app.get("/api/meditations/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     const meditation = await storage.getMeditation(id);
@@ -53,6 +63,32 @@ export async function registerRoutes(app: Express) {
     }
 
     res.json(meditation);
+  });
+
+  app.patch("/api/meditations/:id/rate", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { rating } = updateMeditationSchema.parse(req.body);
+
+      const meditation = await storage.rateMeditation(id, rating);
+      res.json(meditation);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to rate meditation" });
+      }
+    }
+  });
+
+  app.delete("/api/meditations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteMeditation(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete meditation" });
+    }
   });
 
   const httpServer = createServer(app);
