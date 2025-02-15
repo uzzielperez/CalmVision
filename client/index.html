@@ -3,9 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mindful Moments - Meditation App</title>
+    <link rel="icon" type="image/svg+xml" href="/meditation.svg" />
   </head>
   <body>
     <div id="root"></div>
+    <!-- Preload meditation background sound -->
+    <audio id="meditation-water" preload="auto" loop>
+      <source src="https://cdn.pixabay.com/download/audio/2022/03/24/audio_12598a8ba5.mp3?filename=water-meditation.mp3" type="audio/mpeg">
+    </audio>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
