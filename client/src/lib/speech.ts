@@ -4,11 +4,20 @@ export function useSpeech() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [utterance, setUtterance] = useState<SpeechSynthesisUtterance>();
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
 
   useEffect(() => {
     function loadVoices() {
       const availableVoices = speechSynthesis.getVoices();
       setVoices(availableVoices);
+
+      // Try to find a soothing voice as default
+      const defaultVoice = availableVoices.find(voice => 
+        voice.name.toLowerCase().includes('female') || 
+        voice.name.toLowerCase().includes('samantha')
+      ) || availableVoices[0];
+
+      setSelectedVoice(defaultVoice);
     }
 
     loadVoices();
@@ -22,14 +31,8 @@ export function useSpeech() {
   const speak = useCallback((text: string) => {
     const newUtterance = new SpeechSynthesisUtterance(text);
 
-    // Find a female voice for a more soothing experience
-    const femaleVoice = voices.find(voice => 
-      voice.name.toLowerCase().includes('female') || 
-      voice.name.toLowerCase().includes('samantha')
-    );
-
-    if (femaleVoice) {
-      newUtterance.voice = femaleVoice;
+    if (selectedVoice) {
+      newUtterance.voice = selectedVoice;
     }
 
     // Adjust speech parameters for a more calming effect
@@ -45,7 +48,7 @@ export function useSpeech() {
     setUtterance(newUtterance);
     speechSynthesis.speak(newUtterance);
     setIsPlaying(true);
-  }, [voices]);
+  }, [selectedVoice]);
 
   const stop = useCallback(() => {
     speechSynthesis.cancel();
@@ -62,5 +65,14 @@ export function useSpeech() {
     setIsPlaying(true);
   }, []);
 
-  return { speak, stop, pause, resume, isPlaying };
+  return { 
+    speak, 
+    stop, 
+    pause, 
+    resume, 
+    isPlaying,
+    voices,
+    selectedVoice,
+    setSelectedVoice
+  };
 }

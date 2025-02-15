@@ -4,9 +4,10 @@ import { useParams } from "wouter";
 import { motion } from "framer-motion";
 import { BlobAnimation } from "@/components/blob-animation";
 import { PlaybackControls } from "@/components/playback-controls";
+import { VoiceSelector } from "@/components/voice-selector";
 import { useAudio } from "@/lib/audio";
 import { useSpeech } from "@/lib/speech";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { type Meditation } from "@shared/schema";
 
 interface MeditationResponse extends Meditation {
@@ -31,7 +32,7 @@ export default function Meditation() {
       speech.stop();
       audio.stop();
     };
-  }, [meditation]);
+  }, [meditation, speech.selectedVoice]);
 
   if (isLoading) {
     return (
@@ -52,7 +53,22 @@ export default function Meditation() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col items-center justify-center p-4">
       <BlobAnimation isPlaying={speech.isPlaying} />
 
-      <div className="mt-8 w-full max-w-md">
+      <div className="mt-8 w-full max-w-md space-y-4">
+        {/* Voice Selection */}
+        <Card className="p-4">
+          <CardContent className="p-0">
+            <VoiceSelector
+              voices={speech.voices}
+              selectedVoice={speech.selectedVoice}
+              onVoiceChange={(voice) => {
+                speech.stop();
+                speech.setSelectedVoice(voice);
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Playback Controls */}
         <PlaybackControls
           isPlaying={speech.isPlaying}
           onPlayPause={() => speech.isPlaying ? speech.pause() : speech.resume()}
