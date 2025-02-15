@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer } from "http";
 import { storage } from "./storage";
 import { generateMeditation } from "./openai";
-import { insertMeditationSchema, updateMeditationSchema } from "@shared/schema";
+import { insertMeditationSchema, updateMeditationSchema, insertJournalEntrySchema } from "@shared/schema";
 import { ZodError } from "zod";
 
 export async function registerRoutes(app: Express) {
@@ -88,6 +88,46 @@ export async function registerRoutes(app: Express) {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete meditation" });
+    }
+  });
+
+  // Journal Entry Routes
+  app.post("/api/meditations/:meditationId/journal", async (req, res) => {
+    try {
+      const meditationId = parseInt(req.params.meditationId);
+      const journalData = insertJournalEntrySchema.parse({
+        ...req.body,
+        meditationId
+      });
+
+      const entry = await storage.createJournalEntry(journalData);
+      res.json(entry);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create journal entry" });
+      }
+    }
+  });
+
+  app.get("/api/meditations/:meditationId/journal", async (req, res) => {
+    try {
+      const meditationId = parseInt(req.params.meditationId);
+      const entries = await storage.listJournalEntriesForMeditation(meditationId);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch journal entries" });
+    }
+  });
+
+  app.patch("/api/journal/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const entry = await storage.updateJournalEntry(id, req.body);
+      res.json(entry);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update journal entry" });
     }
   });
 

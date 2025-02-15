@@ -7,11 +7,13 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmotionTracker } from "@/components/emotion-tracker";
 import { useToast } from "@/hooks/use-toast";
 import { type Meditation } from "@shared/schema";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
+  const [showEmotionTracker, setShowEmotionTracker] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -20,17 +22,39 @@ export default function Home() {
       const res = await apiRequest("POST", "/api/meditations", { prompt });
       return res.json() as Promise<Meditation & { duration: number }>;
     },
-    onSuccess: (data) => {
-      setLocation(`/meditation/${data.id}`);
+  });
+
+  const createJournalEntry = useMutation({
+    mutationFn: async ({ meditationId, ...data }: { meditationId: number } & any) => {
+      await apiRequest("POST", `/api/meditations/${meditationId}/journal`, data);
+    },
+    onSuccess: (_, { meditationId }) => {
+      setLocation(`/meditation/${meditationId}`);
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to generate meditation. Please try again.",
+        description: "Failed to save your emotions. Please try again.",
         variant: "destructive",
       });
     },
   });
+
+  const handleSubmitEmotion = async (data: any) => {
+    try {
+      const meditation = await createMeditation.mutateAsync(prompt);
+      await createJournalEntry.mutateAsync({
+        meditationId: meditation.id,
+        ...data,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create meditation. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
@@ -51,26 +75,35 @@ export default function Home() {
             </Button>
           </div>
 
-          <p className="text-center text-muted-foreground">
-            Enter your intention or desired focus for meditation
-          </p>
+          {!showEmotionTracker ? (
+            <>
+              <p className="text-center text-muted-foreground">
+                Enter your intention or desired focus for meditation
+              </p>
 
-          <div className="space-y-4">
-            <Input
-              placeholder="e.g., Finding inner peace and clarity..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="text-lg"
+              <div className="space-y-4">
+                <Input
+                  placeholder="e.g., Finding inner peace and clarity..."
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  className="text-lg"
+                />
+
+                <Button
+                  onClick={() => setShowEmotionTracker(true)}
+                  disabled={!prompt}
+                  className="w-full"
+                >
+                  Continue
+                </Button>
+              </div>
+            </>
+          ) : (
+            <EmotionTracker 
+              meditationId={-1} // Temporary ID, will be replaced after meditation creation
+              onSubmit={handleSubmitEmotion}
             />
-
-            <Button
-              onClick={() => createMeditation.mutate(prompt)}
-              disabled={!prompt || createMeditation.isPending}
-              className="w-full"
-            >
-              {createMeditation.isPending ? "Generating..." : "Begin Meditation"}
-            </Button>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
