@@ -9,10 +9,12 @@ export const meditations = pgTable("meditations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertMeditationSchema = createInsertSchema(meditations).pick({
-  prompt: true,
-  content: true,
-});
+// Only require prompt for insertion, content will be generated
+export const insertMeditationSchema = createInsertSchema(meditations)
+  .pick({ prompt: true })
+  .extend({
+    prompt: z.string().min(1, "Please enter a meditation prompt"),
+  });
 
 export type InsertMeditation = z.infer<typeof insertMeditationSchema>;
 export type Meditation = typeof meditations.$inferSelect;

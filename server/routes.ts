@@ -8,26 +8,33 @@ import { ZodError } from "zod";
 export async function registerRoutes(app: Express) {
   app.post("/api/meditations", async (req, res) => {
     try {
-      if (!req.body || !req.body.prompt) {
-        return res.status(400).json({ error: "Missing prompt in request body" });
-      }
-
-      const parsed = insertMeditationSchema.parse(req.body);
+      // Validate request body
+      const { prompt } = insertMeditationSchema.parse(req.body);
+      console.log('Received meditation prompt:', prompt);
 
       try {
-        const generated = await generateMeditation(parsed.prompt);
+        // Generate meditation content
+        console.log('Generating meditation...');
+        const generated = await generateMeditation(prompt);
+        console.log('Generated meditation content successfully');
+
+        // Store in database
         const meditation = await storage.createMeditation({
-          prompt: parsed.prompt,
+          prompt,
           content: generated.content
         });
 
         res.json({ ...meditation, duration: generated.duration });
       } catch (error) {
         console.error('Generation error:', error);
-        res.status(500).json({ error: "Failed to generate meditation" });
+        res.status(500).json({ 
+          error: "Failed to generate meditation",
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error('Validation error:', error.errors);
         res.status(400).json({ error: error.errors });
       } else {
         console.error('Unexpected error:', error);
