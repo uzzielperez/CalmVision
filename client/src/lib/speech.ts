@@ -63,10 +63,18 @@ export function useSpeech() {
       newUtterance.voice = selectedVoice;
     }
 
-    // Adjust speech parameters for a more calming effect
-    newUtterance.rate = 0.85;  // Slightly slower
-    newUtterance.pitch = 0.95; // Slightly lower pitch
+    // Adjust speech parameters for a more calming, relaxed effect
+    newUtterance.rate = 0.7;  // Even slower for meditation
+    newUtterance.pitch = 0.9; // Slightly lower pitch for a calmer tone
     newUtterance.volume = 0.8; // Slightly softer
+
+    // Add pauses between sentences
+    const textWithPauses = text
+      .replace(/\./g, '... <break time="1.5s"/>') // Longer pause after sentences
+      .replace(/,/g, ', <break time="0.7s"/>') // Medium pause after commas
+      .replace(/\n/g, '\n<break time="2s"/>'); // Extra long pause between paragraphs
+
+    newUtterance.text = textWithPauses;
 
     newUtterance.onstart = () => setIsPlaying(true);
     newUtterance.onend = () => setIsPlaying(false);

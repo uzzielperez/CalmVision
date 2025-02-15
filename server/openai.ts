@@ -17,6 +17,10 @@ export async function generateMeditation(prompt: string): Promise<GeneratedMedit
           role: "system",
           content: `You are a meditation guide specialized in creating calming, personalized meditations.
 Generate a meditation script that includes breathing instructions and visualization.
+Use natural pauses and pacing, with explicit breathing cues (inhale... hold... exhale...).
+Add longer pauses between sections using [...].
+Start with breathing exercises before moving to visualization.
+
 The response MUST be a valid JSON object with exactly these fields:
 {
   "content": "the meditation script as a string",
@@ -45,8 +49,11 @@ The response MUST be a valid JSON object with exactly these fields:
         content: parsed.content,
         duration: parsed.duration
       };
-    } catch (e) {
-      throw new Error(`Failed to parse OpenAI response: ${e.message}`);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        throw new Error(`Failed to parse OpenAI response: ${e.message}`);
+      }
+      throw new Error('Failed to parse OpenAI response');
     }
   } catch (error) {
     console.error('OpenAI API Error:', error);
