@@ -22,6 +22,10 @@ interface Voice {
   name: string;
 }
 
+interface VoicesResponse {
+  voices: Voice[];
+}
+
 export default function Meditation() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
@@ -33,9 +37,11 @@ export default function Meditation() {
     queryKey: [`/api/meditations/${id}`],
   });
 
-  const { data: voices, isLoading: voicesLoading } = useQuery<Voice[]>({
+  const { data: voicesResponse, isLoading: voicesLoading } = useQuery<VoicesResponse>({
     queryKey: ['/api/voices'],
   });
+
+  const voices = voicesResponse?.voices || [];
 
   const audio = useAudio(id && selectedVoiceId ? 
     `/api/meditations/${id}/audio?voice_id=${selectedVoiceId}` : 
@@ -149,7 +155,7 @@ export default function Meditation() {
         <Card className="p-4">
           <CardContent className="p-0">
             <VoiceSelector
-              voices={voices || []}
+              voices={voices}
               selectedVoiceId={selectedVoiceId}
               onVoiceChange={(voiceId) => {
                 audio.stop();

@@ -10,8 +10,9 @@ export async function registerRoutes(app: Express) {
   // Get available voices
   app.get("/api/voices", async (_req, res) => {
     try {
-      const voices = await listVoices();
-      res.json(voices);
+      const voicesData = await listVoices();
+      // Pass through the voices array directly
+      res.json(voicesData);
     } catch (error) {
       console.error('Failed to fetch voices:', error);
       res.status(500).json({ error: "Failed to fetch voices" });
