@@ -25,18 +25,21 @@ export function useAudio(audioUrl?: string) {
     }
   }, [volume]);
 
-  const play = useCallback(() => {
+  const play = useCallback(async () => {
     if (audioRef.current) {
       console.log('Attempting to play audio...');
-      audioRef.current.play().then(() => {
+      try {
+        await audioRef.current.play();
         console.log('Audio playing successfully');
         setIsPlaying(true);
-      }).catch(error => {
+      } catch (error) {
         console.error('Error playing audio:', error);
         setIsPlaying(false);
-      });
+        throw error;
+      }
     } else {
       console.warn('No audio element available to play');
+      throw new Error('No audio element available');
     }
   }, []);
 

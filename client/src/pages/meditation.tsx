@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
+import { History, PlusCircle } from "lucide-react";
 import { BlobAnimation } from "@/components/blob-animation";
 import { PlaybackControls } from "@/components/playback-controls";
 import { EmotionTracker } from "@/components/emotion-tracker";
@@ -33,6 +34,7 @@ export default function Meditation() {
   const [showEmotionTracker, setShowEmotionTracker] = useState(false);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>();
   const [retryCount, setRetryCount] = useState(0);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
 
   const { data: meditation, isLoading: meditationLoading } = useQuery<MeditationResponse>({
     queryKey: [`/api/meditations/${id}`],
@@ -133,7 +135,10 @@ export default function Meditation() {
   useEffect(() => {
     if (meditation && selectedVoiceId) {
       setRetryCount(0); // Reset retry count when voice changes
-      audio.play();
+      setIsAudioLoading(true);
+      audio.play()
+        .then(() => setIsAudioLoading(false))
+        .catch(() => setIsAudioLoading(false));
     }
     return () => {
       audio.stop();
@@ -177,6 +182,20 @@ export default function Meditation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col items-center justify-center p-4">
+      {/* Navigation Buttons */}
+      <div className="fixed top-4 right-4 flex gap-2">
+        <Button variant="outline" size="icon" asChild>
+          <Link href="/history">
+            <History className="h-5 w-5" />
+          </Link>
+        </Button>
+        <Button variant="outline" size="icon" asChild>
+          <Link href="/">
+            <PlusCircle className="h-5 w-5" />
+          </Link>
+        </Button>
+      </div>
+
       <BlobAnimation isPlaying={audio.isPlaying} />
 
       <div className="mt-8 w-full max-w-md space-y-4">
@@ -206,7 +225,7 @@ export default function Meditation() {
 
         {/* Playback Controls */}
         <PlaybackControls
-          isPlaying={audio.isPlaying}
+          isPlaying={audio.isPlaying || isAudioLoading}
           onPlayPause={() => audio.isPlaying ? audio.pause() : audio.play()}
           volume={audio.volume}
           onVolumeChange={audio.setVolume}
