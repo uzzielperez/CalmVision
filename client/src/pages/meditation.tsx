@@ -7,7 +7,7 @@ import { PlaybackControls } from "@/components/playback-controls";
 import { EmotionTracker } from "@/components/emotion-tracker";
 import { VoiceSelector } from "@/components/voice-selector";
 import { useAudio } from "@/lib/audio";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -32,6 +32,7 @@ export default function Meditation() {
   const { toast } = useToast();
   const [showEmotionTracker, setShowEmotionTracker] = useState(false);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>();
+  const [retryCount, setRetryCount] = useState(0);
 
   const { data: meditation, isLoading: meditationLoading } = useQuery<MeditationResponse>({
     queryKey: [`/api/meditations/${id}`],
@@ -83,27 +84,42 @@ export default function Meditation() {
     }
   }, [audio.audioRef.current]);
 
-  // Handle audio error
+  // Handle audio error with retry logic
   useEffect(() => {
     const audioElement = audio.audioRef.current;
     if (audioElement) {
       const handleError = (e: any) => {
         console.error('Audio playback error:', e);
-        toast({
-          title: "Audio Error",
-          description: "Failed to play meditation audio. Please try again.",
-          variant: "destructive",
-        });
+
+        // Retry logic for concurrent requests
+        if (retryCount < 3) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+            audio.play();
+          }, 2000 * (retryCount + 1)); // Exponential backoff
+
+          toast({
+            title: "Retrying playback",
+            description: "Please wait a moment while we retry...",
+          });
+        } else {
+          toast({
+            title: "Audio Error",
+            description: "Failed to play meditation audio. Please try selecting a different voice.",
+            variant: "destructive",
+          });
+        }
       };
       audioElement.addEventListener('error', handleError);
       return () => {
         audioElement.removeEventListener('error', handleError);
       };
     }
-  }, [audio.audioRef.current]);
+  }, [audio.audioRef.current, retryCount]);
 
   useEffect(() => {
     if (meditation && selectedVoiceId) {
+      setRetryCount(0); // Reset retry count when voice changes
       audio.play();
     }
     return () => {
@@ -151,6 +167,16 @@ export default function Meditation() {
       <BlobAnimation isPlaying={audio.isPlaying} />
 
       <div className="mt-8 w-full max-w-md space-y-4">
+        {/* Meditation Description */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Meditation Journey</CardTitle>
+            <CardDescription className="text-lg">
+              {meditation?.prompt}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
         {/* Voice Selection */}
         <Card className="p-4">
           <CardContent className="p-0">
