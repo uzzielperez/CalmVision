@@ -48,6 +48,38 @@ export default function Meditation() {
     },
   });
 
+  // Handle audio ended event
+  useEffect(() => {
+    const audioElement = audio.audioRef.current;
+    if (audioElement) {
+      const handleEnded = () => {
+        setShowEmotionTracker(true);
+      };
+      audioElement.addEventListener('ended', handleEnded);
+      return () => {
+        audioElement.removeEventListener('ended', handleEnded);
+      };
+    }
+  }, [audio.audioRef.current]);
+
+  // Handle audio error
+  useEffect(() => {
+    const audioElement = audio.audioRef.current;
+    if (audioElement) {
+      const handleError = (e: ErrorEvent) => {
+        toast({
+          title: "Audio Error",
+          description: "Failed to play meditation audio. Please try again.",
+          variant: "destructive",
+        });
+      };
+      audioElement.addEventListener('error', handleError);
+      return () => {
+        audioElement.removeEventListener('error', handleError);
+      };
+    }
+  }, [audio.audioRef.current]);
+
   useEffect(() => {
     if (meditation) {
       audio.play();
@@ -57,11 +89,6 @@ export default function Meditation() {
     };
   }, [meditation]);
 
-  useEffect(() => {
-    if (!audio.isPlaying && meditation && !showEmotionTracker) {
-      setShowEmotionTracker(true);
-    }
-  }, [audio.isPlaying, meditation]);
 
   if (isLoading) {
     return (

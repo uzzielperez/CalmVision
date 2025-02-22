@@ -49,5 +49,5 @@ export function useAudio(audioUrl?: string) {
     }
   }, []);
 
-  return { play, pause, stop, isPlaying, volume, setVolume };
+  return { play, pause, stop, isPlaying, volume, setVolume, audioRef };
 }
