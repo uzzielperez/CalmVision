@@ -52,6 +52,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteMeditation(id: number): Promise<void> {
+    // First delete related journal entries
+    await db
+      .delete(journalEntries)
+      .where(eq(journalEntries.meditationId, id));
+
+    // Then delete the meditation
     await db
       .delete(meditations)
       .where(eq(meditations.id, id));
