@@ -136,9 +136,16 @@ export default function Meditation() {
     if (meditation && selectedVoiceId) {
       setRetryCount(0); // Reset retry count when voice changes
       setIsAudioLoading(true);
-      audio.play()
-        .then(() => setIsAudioLoading(false))
-        .catch(() => setIsAudioLoading(false));
+
+      // Wait a brief moment to ensure audio is initialized
+      setTimeout(() => {
+        audio.play()
+          .then(() => setIsAudioLoading(false))
+          .catch((error) => {
+            console.error('Failed to play audio:', error);
+            setIsAudioLoading(false);
+          });
+      }, 1000);
     }
     return () => {
       audio.stop();
@@ -225,7 +232,7 @@ export default function Meditation() {
 
         {/* Playback Controls */}
         <PlaybackControls
-          isPlaying={audio.isPlaying || isAudioLoading}
+          isPlaying={audio.isPlaying || isAudioLoading || audio.isLoading}
           onPlayPause={() => audio.isPlaying ? audio.pause() : audio.play()}
           volume={audio.volume}
           onVolumeChange={audio.setVolume}
