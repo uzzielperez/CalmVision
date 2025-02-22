@@ -8,11 +8,33 @@ export function useAudio(audioUrl?: string) {
   useEffect(() => {
     if (audioUrl) {
       console.log('Creating new audio with URL:', audioUrl);
-      audioRef.current = new Audio(audioUrl);
-      audioRef.current.volume = volume;
+      const audio = new Audio();
+      audio.volume = volume;
+
+      // Fetch the audio and create a blob URL
+      fetch(audioUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.blob();
+        })
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          audio.src = url;
+          audioRef.current = audio;
+        })
+        .catch(error => {
+          console.error('Error loading audio:', error);
+        });
     }
+
     return () => {
       if (audioRef.current) {
+        const src = audioRef.current.src;
+        if (src.startsWith('blob:')) {
+          URL.revokeObjectURL(src);
+        }
         audioRef.current.pause();
         audioRef.current = null;
       }

@@ -19,7 +19,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Get audio for a meditation
+  // Update the audio endpoint to handle streaming properly
   app.get("/api/meditations/:id/audio", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -34,15 +34,22 @@ export async function registerRoutes(app: Express) {
 
       const audioBuffer = await synthesizeSpeech(meditation.content, voiceId);
 
+      // Set proper headers for audio streaming
       res.set({
         'Content-Type': 'audio/mpeg',
         'Content-Length': audioBuffer.length,
+        'Cache-Control': 'no-cache',
+        'Content-Disposition': 'inline',
       });
 
       res.send(audioBuffer);
     } catch (error) {
       console.error('Failed to generate audio:', error);
-      res.status(500).json({ error: "Failed to generate audio" });
+      if (error instanceof Error) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Failed to generate audio" });
+      }
     }
   });
 
