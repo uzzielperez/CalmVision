@@ -22,6 +22,8 @@ export async function registerRoutes(app: Express) {
   app.get("/api/meditations/:id/audio", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const voiceId = req.query.voice_id as string;
+
       const meditation = await storage.getMeditation(id);
 
       if (!meditation) {
@@ -29,7 +31,7 @@ export async function registerRoutes(app: Express) {
         return;
       }
 
-      const audioBuffer = await synthesizeSpeech(meditation.content);
+      const audioBuffer = await synthesizeSpeech(meditation.content, voiceId);
 
       res.set({
         'Content-Type': 'audio/mpeg',

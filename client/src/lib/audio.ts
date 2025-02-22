@@ -7,6 +7,7 @@ export function useAudio(audioUrl?: string) {
 
   useEffect(() => {
     if (audioUrl) {
+      console.log('Creating new audio with URL:', audioUrl);
       audioRef.current = new Audio(audioUrl);
       audioRef.current.volume = volume;
     }
@@ -26,11 +27,16 @@ export function useAudio(audioUrl?: string) {
 
   const play = useCallback(() => {
     if (audioRef.current) {
+      console.log('Attempting to play audio...');
       audioRef.current.play().then(() => {
+        console.log('Audio playing successfully');
         setIsPlaying(true);
       }).catch(error => {
         console.error('Error playing audio:', error);
+        setIsPlaying(false);
       });
+    } else {
+      console.warn('No audio element available to play');
     }
   }, []);
 

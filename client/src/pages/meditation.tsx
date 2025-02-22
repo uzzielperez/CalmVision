@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { BlobAnimation } from "@/components/blob-animation";
 import { PlaybackControls } from "@/components/playback-controls";
 import { EmotionTracker } from "@/components/emotion-tracker";
+import { VoiceSelector } from "@/components/voice-selector";
 import { useAudio } from "@/lib/audio";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,17 +17,30 @@ interface MeditationResponse extends Meditation {
   duration: number;
 }
 
+interface Voice {
+  voice_id: string;
+  name: string;
+}
+
 export default function Meditation() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showEmotionTracker, setShowEmotionTracker] = useState(false);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>();
 
-  const { data: meditation, isLoading } = useQuery<MeditationResponse>({
-    queryKey: ["/api/meditations/" + id],
+  const { data: meditation, isLoading: meditationLoading } = useQuery<MeditationResponse>({
+    queryKey: [`/api/meditations/${id}`],
   });
 
-  const audio = useAudio(id ? `/api/meditations/${id}/audio` : undefined);
+  const { data: voices, isLoading: voicesLoading } = useQuery<Voice[]>({
+    queryKey: ['/api/voices'],
+  });
+
+  const audio = useAudio(id && selectedVoiceId ? 
+    `/api/meditations/${id}/audio?voice_id=${selectedVoiceId}` : 
+    undefined
+  );
 
   const updateJournalEntry = useMutation({
     mutationFn: async (data: any) => {
@@ -53,6 +67,7 @@ export default function Meditation() {
     const audioElement = audio.audioRef.current;
     if (audioElement) {
       const handleEnded = () => {
+        console.log('Audio playback ended');
         setShowEmotionTracker(true);
       };
       audioElement.addEventListener('ended', handleEnded);
@@ -66,7 +81,8 @@ export default function Meditation() {
   useEffect(() => {
     const audioElement = audio.audioRef.current;
     if (audioElement) {
-      const handleError = (e: ErrorEvent) => {
+      const handleError = (e: any) => {
+        console.error('Audio playback error:', e);
         toast({
           title: "Audio Error",
           description: "Failed to play meditation audio. Please try again.",
@@ -81,16 +97,15 @@ export default function Meditation() {
   }, [audio.audioRef.current]);
 
   useEffect(() => {
-    if (meditation) {
+    if (meditation && selectedVoiceId) {
       audio.play();
     }
     return () => {
       audio.stop();
     };
-  }, [meditation]);
+  }, [meditation, selectedVoiceId]);
 
-
-  if (isLoading) {
+  if (meditationLoading || voicesLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center">
         <Card className="p-8">
@@ -130,6 +145,20 @@ export default function Meditation() {
       <BlobAnimation isPlaying={audio.isPlaying} />
 
       <div className="mt-8 w-full max-w-md space-y-4">
+        {/* Voice Selection */}
+        <Card className="p-4">
+          <CardContent className="p-0">
+            <VoiceSelector
+              voices={voices || []}
+              selectedVoiceId={selectedVoiceId}
+              onVoiceChange={(voiceId) => {
+                audio.stop();
+                setSelectedVoiceId(voiceId);
+              }}
+            />
+          </CardContent>
+        </Card>
+
         {/* Playback Controls */}
         <PlaybackControls
           isPlaying={audio.isPlaying}
