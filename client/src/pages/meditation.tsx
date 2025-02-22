@@ -44,8 +44,8 @@ export default function Meditation() {
 
   const voices = voicesResponse?.voices || [];
 
-  const audio = useAudio(id && selectedVoiceId ? 
-    `/api/meditations/${id}/audio?voice_id=${selectedVoiceId}` : 
+  const audio = useAudio(id && selectedVoiceId ?
+    `/api/meditations/${id}/audio?voice_id=${selectedVoiceId}` :
     undefined
   );
 
@@ -88,7 +88,7 @@ export default function Meditation() {
   useEffect(() => {
     const audioElement = audio.audioRef.current;
     if (audioElement) {
-      const handleError = (e: any) => {
+      const handleError = async (e: any) => {
         console.error('Audio playback error:', e);
 
         // Retry logic for concurrent requests
@@ -103,19 +103,32 @@ export default function Meditation() {
             description: "Please wait a moment while we retry...",
           });
         } else {
-          toast({
-            title: "Audio Error",
-            description: "Failed to play meditation audio. Please try selecting a different voice.",
-            variant: "destructive",
-          });
+          // Try to get the actual error message from the server
+          try {
+            const errorResponse = await fetch(`/api/meditations/${id}/audio?voice_id=${selectedVoiceId}`);
+            const errorData = await errorResponse.json();
+
+            toast({
+              title: "Audio Generation Failed",
+              description: errorData.error || "Failed to generate audio. Please try selecting a different voice or using a shorter meditation.",
+              variant: "destructive",
+            });
+          } catch {
+            toast({
+              title: "Audio Error",
+              description: "Failed to play meditation audio. Please try selecting a different voice.",
+              variant: "destructive",
+            });
+          }
         }
       };
+
       audioElement.addEventListener('error', handleError);
       return () => {
         audioElement.removeEventListener('error', handleError);
       };
     }
-  }, [audio.audioRef.current, retryCount]);
+  }, [audio.audioRef.current, retryCount, id, selectedVoiceId]);
 
   useEffect(() => {
     if (meditation && selectedVoiceId) {
