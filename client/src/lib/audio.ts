@@ -1,38 +1,53 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
-export function useAudio() {
-  const [audio, setAudio] = useState<HTMLAudioElement>();
+export function useAudio(audioUrl?: string) {
   const [volume, setVolume] = useState(0.5);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    const audioElement = document.getElementById('meditation-water') as HTMLAudioElement;
-    if (audioElement) {
-      audioElement.volume = volume;
-      setAudio(audioElement);
+    if (audioUrl) {
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.volume = volume;
     }
-  }, []);
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [audioUrl]);
 
   useEffect(() => {
-    if (audio) {
-      audio.volume = volume;
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
     }
-  }, [volume, audio]);
+  }, [volume]);
 
   const play = useCallback(() => {
-    if (audio) {
-      audio.currentTime = 0;
-      audio.play().catch(error => {
+    if (audioRef.current) {
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(error => {
         console.error('Error playing audio:', error);
       });
     }
-  }, [audio]);
+  }, []);
+
+  const pause = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  }, []);
 
   const stop = useCallback(() => {
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlaying(false);
     }
-  }, [audio]);
+  }, []);
 
-  return { play, stop, volume, setVolume };
+  return { play, pause, stop, isPlaying, volume, setVolume };
 }

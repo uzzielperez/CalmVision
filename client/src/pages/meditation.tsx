@@ -4,10 +4,8 @@ import { useParams, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { BlobAnimation } from "@/components/blob-animation";
 import { PlaybackControls } from "@/components/playback-controls";
-import { VoiceSelector } from "@/components/voice-selector";
 import { EmotionTracker } from "@/components/emotion-tracker";
 import { useAudio } from "@/lib/audio";
-import { useSpeech } from "@/lib/speech";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -22,13 +20,13 @@ export default function Meditation() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const audio = useAudio();
-  const speech = useSpeech();
   const [showEmotionTracker, setShowEmotionTracker] = useState(false);
 
   const { data: meditation, isLoading } = useQuery<MeditationResponse>({
     queryKey: ["/api/meditations/" + id],
   });
+
+  const audio = useAudio(id ? `/api/meditations/${id}/audio` : undefined);
 
   const updateJournalEntry = useMutation({
     mutationFn: async (data: any) => {
@@ -52,20 +50,18 @@ export default function Meditation() {
 
   useEffect(() => {
     if (meditation) {
-      speech.speak(meditation.content);
       audio.play();
     }
     return () => {
-      speech.stop();
       audio.stop();
     };
-  }, [meditation, speech.selectedVoice]);
+  }, [meditation]);
 
   useEffect(() => {
-    if (!speech.isPlaying && meditation && !showEmotionTracker) {
+    if (!audio.isPlaying && meditation && !showEmotionTracker) {
       setShowEmotionTracker(true);
     }
-  }, [speech.isPlaying, meditation]);
+  }, [audio.isPlaying, meditation]);
 
   if (isLoading) {
     return (
@@ -104,27 +100,13 @@ export default function Meditation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col items-center justify-center p-4">
-      <BlobAnimation isPlaying={speech.isPlaying} />
+      <BlobAnimation isPlaying={audio.isPlaying} />
 
       <div className="mt-8 w-full max-w-md space-y-4">
-        {/* Voice Selection */}
-        <Card className="p-4">
-          <CardContent className="p-0">
-            <VoiceSelector
-              voices={speech.voices}
-              selectedVoice={speech.selectedVoice}
-              onVoiceChange={(voice) => {
-                speech.stop();
-                speech.setSelectedVoice(voice);
-              }}
-            />
-          </CardContent>
-        </Card>
-
         {/* Playback Controls */}
         <PlaybackControls
-          isPlaying={speech.isPlaying}
-          onPlayPause={() => speech.isPlaying ? speech.pause() : speech.resume()}
+          isPlaying={audio.isPlaying}
+          onPlayPause={() => audio.isPlaying ? audio.pause() : audio.play()}
           volume={audio.volume}
           onVolumeChange={audio.setVolume}
         />

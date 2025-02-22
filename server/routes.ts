@@ -2,10 +2,47 @@ import type { Express } from "express";
 import { createServer } from "http";
 import { storage } from "./storage";
 import { generateMeditation } from "./openai";
+import { synthesizeSpeech, listVoices } from "./elevenlabs";
 import { insertMeditationSchema, updateMeditationSchema, insertJournalEntrySchema } from "@shared/schema";
 import { ZodError } from "zod";
 
 export async function registerRoutes(app: Express) {
+  // Get available voices
+  app.get("/api/voices", async (_req, res) => {
+    try {
+      const voices = await listVoices();
+      res.json(voices);
+    } catch (error) {
+      console.error('Failed to fetch voices:', error);
+      res.status(500).json({ error: "Failed to fetch voices" });
+    }
+  });
+
+  // Get audio for a meditation
+  app.get("/api/meditations/:id/audio", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const meditation = await storage.getMeditation(id);
+
+      if (!meditation) {
+        res.status(404).json({ error: "Meditation not found" });
+        return;
+      }
+
+      const audioBuffer = await synthesizeSpeech(meditation.content);
+
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length,
+      });
+
+      res.send(audioBuffer);
+    } catch (error) {
+      console.error('Failed to generate audio:', error);
+      res.status(500).json({ error: "Failed to generate audio" });
+    }
+  });
+
   app.post("/api/meditations", async (req, res) => {
     try {
       // Validate request body
