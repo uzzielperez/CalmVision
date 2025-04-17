@@ -1,0 +1,25 @@
+# General settings
+[build]
+  # Directory to run the build command from (root in this case)
+  base = "."
+  
+  # Build command for the frontend (assuming Vite is used in client/)
+  command = "npm run build"
+  
+  # Directory where the built frontend files are output (adjust based on your setup)
+  publish = "client/dist"
+
+# Environment variables (optional)
+[build.environment]
+  NODE_VERSION = "18"  # Specify Node.js version if needed
+
+# Serverless functions (if you have a server/ folder for backend)
+[functions]
+  # Directory where serverless functions are located (e.g., for Netlify Functions)
+  directory = "server/functions"
+
+# Redirects (optional, for SPA routing if applicable)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

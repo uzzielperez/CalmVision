@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { History, PlusCircle } from "lucide-react";
 import { BlobAnimation } from "@/components/blob-animation";
 import { PlaybackControls } from "@/components/playback-controls";
-import { EmotionTracker } from "@/components/emotion-tracker";
 import { VoiceSelector } from "@/components/voice-selector";
 import { useAudio } from "@/lib/audio";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -31,107 +30,78 @@ export default function Meditation() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [showEmotionTracker, setShowEmotionTracker] = useState(false);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>();
   const [retryCount, setRetryCount] = useState(0);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
 
+  // Fetch meditation data
   const { data: meditation, isLoading: meditationLoading } = useQuery<MeditationResponse>({
     queryKey: [`/api/meditations/${id}`],
   });
 
+  // Fetch available voices
   const { data: voicesResponse, isLoading: voicesLoading } = useQuery<VoicesResponse>({
     queryKey: ['/api/voices'],
   });
 
   const voices = voicesResponse?.voices || [];
 
-  const audio = useAudio(id && selectedVoiceId ?
-    `/api/meditations/${id}/audio?voice_id=${selectedVoiceId}` :
-    undefined
+  // Initialize audio
+  const audio = useAudio(
+    id && selectedVoiceId
+      ? `/api/meditations/${id}/audio?voice_id=${selectedVoiceId}`
+      : undefined
   );
 
-  const updateJournalEntry = useMutation({
-    mutationFn: async (data: any) => {
-      await apiRequest("PATCH", `/api/meditations/${id}/journal`, {
-        emotionAfter: data.emotionBefore,
-        notes: data.notes,
-        emotions: data.emotions,
-      });
-    },
-    onSuccess: () => {
-      setLocation("/history");
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save your emotions. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Handle audio ended event
+  // Handle audio playback errors with retry logic
   useEffect(() => {
     const audioElement = audio.audioRef.current;
-    if (audioElement) {
-      const handleEnded = () => {
-        console.log('Audio playback ended');
-        setShowEmotionTracker(true);
-      };
-      audioElement.addEventListener('ended', handleEnded);
-      return () => {
-        audioElement.removeEventListener('ended', handleEnded);
-      };
-    }
-  }, [audio.audioRef.current]);
+    if (!audioElement) return;
 
-  // Handle audio error with retry logic
-  useEffect(() => {
-    const audioElement = audio.audioRef.current;
-    if (audioElement) {
-      const handleError = async (e: any) => {
-        console.error('Audio playback error:', e);
+    const handleError = async (e: any) => {
+      console.error('Audio playback error:', e);
 
-        // Retry logic for concurrent requests
-        if (retryCount < 3) {
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-            audio.play();
-          }, 2000 * (retryCount + 1)); // Exponential backoff
+      // Retry logic (up to 3 times)
+      if (retryCount < 3) {
+        setTimeout(() => {
+          setRetryCount((prev) => prev + 1);
+          audio.play();
+        }, 2000 * (retryCount + 1)); // Exponential backoff
+
+        toast({
+          title: "Retrying playback",
+          description: "Please wait a moment while we retry...",
+        });
+      } else {
+        // Fetch error details from the server
+        try {
+          const errorResponse = await fetch(`/api/meditations/${id}/audio?voice_id=${selectedVoiceId}`);
+          const errorData = await errorResponse.json();
 
           toast({
-            title: "Retrying playback",
-            description: "Please wait a moment while we retry...",
+            title: "Audio Generation Failed",
+            description:
+              errorData.error ||
+              "Failed to generate audio. Please try selecting a different voice or using a shorter meditation.",
+            variant: "destructive",
           });
-        } else {
-          // Try to get the actual error message from the server
-          try {
-            const errorResponse = await fetch(`/api/meditations/${id}/audio?voice_id=${selectedVoiceId}`);
-            const errorData = await errorResponse.json();
-
-            toast({
-              title: "Audio Generation Failed",
-              description: errorData.error || "Failed to generate audio. Please try selecting a different voice or using a shorter meditation.",
-              variant: "destructive",
-            });
-          } catch {
-            toast({
-              title: "Audio Error",
-              description: "Failed to play meditation audio. Please try selecting a different voice.",
-              variant: "destructive",
-            });
-          }
+        } catch {
+          toast({
+            title: "Audio Error",
+            description: "Failed to play meditation audio. Please try selecting a different voice.",
+            variant: "destructive",
+          });
         }
-      };
+      }
+    };
 
-      audioElement.addEventListener('error', handleError);
-      return () => {
-        audioElement.removeEventListener('error', handleError);
-      };
-    }
+    audioElement.addEventListener('error', handleError);
+    return () => {
+      audioElement.removeEventListener('error', handleError);
+    };
   }, [audio.audioRef.current, retryCount, id, selectedVoiceId]);
 
+  // Play audio when meditation and voice are selected
   useEffect(() => {
     if (meditation && selectedVoiceId) {
       setRetryCount(0); // Reset retry count when voice changes
@@ -139,7 +109,8 @@ export default function Meditation() {
 
       // Wait a brief moment to ensure audio is initialized
       setTimeout(() => {
-        audio.play()
+        audio
+          .play()
           .then(() => setIsAudioLoading(false))
           .catch((error) => {
             console.error('Failed to play audio:', error);
@@ -147,11 +118,13 @@ export default function Meditation() {
           });
       }, 1000);
     }
+
     return () => {
       audio.stop();
     };
   }, [meditation, selectedVoiceId]);
 
+  // Loading state
   if (meditationLoading || voicesLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center">
@@ -167,26 +140,7 @@ export default function Meditation() {
     );
   }
 
-  if (showEmotionTracker) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
-        <div className="w-full max-w-lg">
-          <EmotionTracker
-            meditationId={parseInt(id!)}
-            onSubmit={updateJournalEntry.mutate}
-          />
-          <Button
-            variant="link"
-            className="mt-4 w-full"
-            onClick={() => setLocation("/history")}
-          >
-            Skip for now
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
+  // Render the meditation page
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col items-center justify-center p-4">
       {/* Navigation Buttons */}
@@ -203,8 +157,10 @@ export default function Meditation() {
         </Button>
       </div>
 
+      {/* Blob Animation */}
       <BlobAnimation isPlaying={audio.isPlaying} />
 
+      {/* Meditation Content */}
       <div className="mt-8 w-full max-w-md space-y-4">
         {/* Meditation Description */}
         <Card>
@@ -233,7 +189,7 @@ export default function Meditation() {
         {/* Playback Controls */}
         <PlaybackControls
           isPlaying={audio.isPlaying || isAudioLoading || audio.isLoading}
-          onPlayPause={() => audio.isPlaying ? audio.pause() : audio.play()}
+          onPlayPause={() => (audio.isPlaying ? audio.pause() : audio.play())}
           volume={audio.volume}
           onVolumeChange={audio.setVolume}
         />

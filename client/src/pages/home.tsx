@@ -7,13 +7,11 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { EmotionTracker } from "@/components/emotion-tracker";
 import { useToast } from "@/hooks/use-toast";
 import { type Meditation } from "@shared/schema";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
-  const [showEmotionTracker, setShowEmotionTracker] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -22,37 +20,33 @@ export default function Home() {
       const res = await apiRequest("POST", "/api/meditations", { prompt });
       return res.json() as Promise<Meditation & { duration: number }>;
     },
-  });
-
-  const createJournalEntry = useMutation({
-    mutationFn: async ({ meditationId, ...data }: { meditationId: number } & any) => {
-      await apiRequest("POST", `/api/meditations/${meditationId}/journal`, data);
-    },
-    onSuccess: (_, { meditationId }) => {
-      setLocation(`/meditation/${meditationId}`);
+    onSuccess: (meditation) => {
+      // Redirect to the meditation page after creation
+      setLocation(`/meditation/${meditation.id}`);
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save your emotions. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSubmitEmotion = async (data: any) => {
-    try {
-      const meditation = await createMeditation.mutateAsync(prompt);
-      await createJournalEntry.mutateAsync({
-        meditationId: meditation.id,
-        ...data,
-      });
-    } catch (error) {
       toast({
         title: "Error",
         description: "Failed to create meditation. Please try again.",
         variant: "destructive",
       });
+    },
+  });
+
+  const handleSubmit = async () => {
+    if (!prompt) {
+      toast({
+        title: "Error",
+        description: "Please enter a meditation prompt.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await createMeditation.mutateAsync(prompt);
+    } catch (error) {
+      console.error("Failed to create meditation:", error);
     }
   };
 
@@ -75,35 +69,29 @@ export default function Home() {
             </Button>
           </div>
 
-          {!showEmotionTracker ? (
-            <>
-              <p className="text-center text-muted-foreground">
-                Enter your intention or desired focus for meditation
-              </p>
+          {/* Removed the emotion tracker and directly proceed to meditation generation */}
+          <>
+            <p className="text-center text-muted-foreground">
+              Enter your intention or desired focus for meditation
+            </p>
 
-              <div className="space-y-4">
-                <Input
-                  placeholder="e.g., Finding inner peace and clarity..."
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  className="text-lg"
-                />
+            <div className="space-y-4">
+              <Input
+                placeholder="e.g., Finding inner peace and clarity..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="text-lg"
+              />
 
-                <Button
-                  onClick={() => setShowEmotionTracker(true)}
-                  disabled={!prompt}
-                  className="w-full"
-                >
-                  Continue
-                </Button>
-              </div>
-            </>
-          ) : (
-            <EmotionTracker 
-              meditationId={-1} // Temporary ID, will be replaced after meditation creation
-              onSubmit={handleSubmitEmotion}
-            />
-          )}
+              <Button
+                onClick={handleSubmit}
+                disabled={!prompt || createMeditation.isPending}
+                className="w-full"
+              >
+                {createMeditation.isPending ? "Creating..." : "Start Meditation"}
+              </Button>
+            </div>
+          </>
         </CardContent>
       </Card>
     </div>
