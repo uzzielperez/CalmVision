@@ -2,7 +2,7 @@ import { Groq } from "groq-sdk";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1"
+  baseURL: "https://api.groq.com" // Removed /openai/v1 from baseURL
 });
 
 // Add connection test function
