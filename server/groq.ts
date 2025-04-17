@@ -18,7 +18,7 @@ export async function listModels() {
 export async function generateMeditation(prompt: string) {
   try {
     const completion = await groq.chat.completions.create({
-      model: "llama2-7b", // Changed to LLaMA 2 7B
+      model: "allam-2-7b", // Changed from llama2-7b to allam-2-7b
       messages: [
         {
           role: "user",
