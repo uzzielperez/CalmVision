@@ -2,7 +2,28 @@ import { Groq } from "groq-sdk";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1"
 });
+
+// Add connection test function
+export async function testConnection() {
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return true;
+  } catch (error) {
+    console.error('Connection test failed:', error);
+    throw error;
+  }
+}
 
 export async function listModels() {
   try {
@@ -16,8 +37,11 @@ export async function listModels() {
 
 export async function generateMeditation(prompt: string) {
   try {
+    // Test connection before proceeding
+    await testConnection();
+
     const completion = await groq.chat.completions.create({
-      model: "llama3-70b-8192", // Changed to llama3-70b-8192
+      model: "llama3-70b-8192",
       messages: [
         {
           role: "system",
@@ -42,6 +66,9 @@ export async function generateMeditation(prompt: string) {
     return { content, duration };
   } catch (error) {
     console.error('Groq API error:', error);
-    throw new Error('Failed to generate meditation. Please check your Groq API connection.');
+    if (error.code === 'ECONNREFUSED') {
+      throw new Error('Connection to Groq API failed. Please check your API key and endpoint configuration.');
+    }
+    throw new Error(`Failed to generate meditation: ${error.message}`);
   }
 }
