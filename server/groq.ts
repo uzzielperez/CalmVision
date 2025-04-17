@@ -4,7 +4,6 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// Add listModels function
 export async function listModels() {
   try {
     const models = await groq.models.list();
@@ -18,16 +17,19 @@ export async function listModels() {
 export async function generateMeditation(prompt: string) {
   try {
     const completion = await groq.chat.completions.create({
-      model: "allam-2-7b", // Changed from llama2-7b to allam-2-7b
+      model: "deepseek-r1-distill-llama-70b",
       messages: [
+        {
+          role: "system",
+          content: "You are a meditation guide. Create calming and insightful meditation scripts."
+        },
         {
           role: "user",
           content: `Create a meditation script based on this prompt: ${prompt}`,
         },
       ],
-      temperature: 1,
-      max_tokens: 1024,
-      top_p: 1,
+      temperature: 0.7,
+      max_tokens: 2048,
       stream: true,
     });
 
@@ -36,7 +38,7 @@ export async function generateMeditation(prompt: string) {
       content += chunk.choices[0]?.delta?.content || "";
     }
 
-    const duration = Math.round(content.length / 15); // Estimate duration in seconds
+    const duration = Math.round(content.length / 15);
     return { content, duration };
   } catch (error) {
     console.error('Groq API error:', error);
