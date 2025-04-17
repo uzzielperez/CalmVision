@@ -4,6 +4,17 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
+// Add listModels function
+export async function listModels() {
+  try {
+    const models = await groq.models.list();
+    return models.data;
+  } catch (error) {
+    console.error('Error listing models:', error);
+    throw error;
+  }
+}
+
 export async function generateMeditation(prompt: string) {
   try {
     const completion = await groq.chat.completions.create({
