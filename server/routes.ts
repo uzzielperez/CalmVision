@@ -6,8 +6,20 @@ import { generateMeditation } from "./groq"; // Import from your Groq implementa
 import { synthesizeSpeech, listVoices } from "./elevenlabs";
 import { insertMeditationSchema, updateMeditationSchema } from "@shared/schema";
 import { ZodError } from "zod";
+import { listModels } from "./groq";
 
 export async function registerRoutes(app: Express) {
+  // Add this new route to list models
+  app.get("/api/models", async (_req, res) => {
+    try {
+      const models = await listModels();
+      res.json(models.map(model => model.id));
+    } catch (error) {
+      console.error('Failed to list models:', error);
+      res.status(500).json({ error: "Failed to list models" });
+    }
+  });
+
   // Get available voices
   app.get("/api/voices", async (_req, res) => {
     try {
