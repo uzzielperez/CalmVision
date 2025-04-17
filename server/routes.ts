@@ -59,7 +59,6 @@ export async function registerRoutes(app: Express) {
       const { prompt } = insertMeditationSchema.parse(req.body);
       console.log('Received meditation prompt:', prompt);
 
-      // Call the Groq function instead of OpenAI
       const generated = await generateMeditation(prompt);
       console.log('Generated meditation content successfully using Groq');
 
@@ -75,8 +74,10 @@ export async function registerRoutes(app: Express) {
         res.status(400).json({ error: error.errors });
       } else {
         console.error('Generation error:', error);
-        // Update error message if needed
-        res.status(500).json({ error: "Failed to generate meditation using Groq" });
+        res.status(500).json({ 
+          error: error.message || "Failed to generate meditation using Groq",
+          details: error instanceof Error ? error.stack : undefined
+        });
       }
     }
   });
