@@ -17,7 +17,7 @@ export async function listModels() {
 export async function generateMeditation(prompt: string) {
   try {
     const completion = await groq.chat.completions.create({
-      model: "deepseek-r1-distill-llama-70b",
+      model: "llama3-70b-8192", // Changed to llama3-70b-8192
       messages: [
         {
           role: "system",
