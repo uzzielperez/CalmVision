@@ -117,6 +117,33 @@ export function serveStatic(app: express.Express) {
       if (fs.existsSync(assetsPath)) {
         const assetFiles = fs.readdirSync(assetsPath);
         log(`Files in assets: ${assetFiles.join(', ')}`);
+        
+        // Fix the index.html to point to the correct JS file
+        const indexPath = path.join(clientDistPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          try {
+            let indexHtml = fs.readFileSync(indexPath, 'utf8');
+            
+            // Find JS files in assets
+            const jsFiles = assetFiles.filter(file => file.endsWith('.js'));
+            log(`JS files in assets: ${jsFiles.join(', ')}`);
+            
+            if (jsFiles.length > 0) {
+              // If there's a reference to /dist/index.js, replace it with the actual file
+              if (indexHtml.includes('/dist/index.js')) {
+                const mainJsFile = jsFiles.find(file => file.startsWith('index-'));
+                if (mainJsFile) {
+                  log(`Replacing /dist/index.js with /assets/${mainJsFile}`);
+                  indexHtml = indexHtml.replace('/dist/index.js', `/assets/${mainJsFile}`);
+                  fs.writeFileSync(indexPath, indexHtml);
+                  log(`Updated index.html to use correct JS file`);
+                }
+              }
+            }
+          } catch (err) {
+            log(`Error updating index.html: ${err}`);
+          }
+        }
       }
     } catch (err) {
       log(`Error reading directory: ${err}`);
