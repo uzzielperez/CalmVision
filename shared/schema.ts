@@ -8,8 +8,8 @@ export const meditations = pgTable("meditations", {
   prompt: text("prompt").notNull(),
   content: text("content"), //remove not null
   rating: integer("rating"), // Rating from 1-5
-  model: text("model"), // Add this line to store the model
-  createdAt: timestamp("created_at").defaultNow(),
+  model: text("model"), // Make sure this exists
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 // Define relations (no journal entries)
