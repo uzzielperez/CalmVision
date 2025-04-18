@@ -134,6 +134,35 @@ export function serveStatic(app: express.Express) {
       } else {
         log(`Assets directory not found at: ${assetsPath}`);
         
+        // Print directory tree for debugging
+        log(`Printing directory tree for debugging:`);
+        try {
+          // Function to recursively list directories
+          const listDir = (dir, depth = 0) => {
+            const indent = '  '.repeat(depth);
+            log(`${indent}${path.basename(dir)}/`);
+            
+            const items = fs.readdirSync(dir);
+            for (const item of items) {
+              const itemPath = path.join(dir, item);
+              const stats = fs.statSync(itemPath);
+              
+              if (stats.isDirectory()) {
+                listDir(itemPath, depth + 1);
+              } else {
+                log(`${indent}  ${item}`);
+              }
+            }
+          };
+          
+          // Start from the parent directory to see the full structure
+          const parentDir = path.dirname(clientDistPath);
+          log(`Starting directory tree from: ${parentDir}`);
+          listDir(parentDir);
+        } catch (err) {
+          log(`Error printing directory tree: ${err}`);
+        }
+        
         // Handle /dist/index.js request when assets directory doesn't exist
         app.get('/dist/index.js', (req, res) => {
           log(`Creating fallback JavaScript file for ${req.path}`);
