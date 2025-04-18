@@ -71,14 +71,37 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 // Update the serveStatic function to handle missing files
+// Update the serveStatic function to handle Render's environment
 export function serveStatic(app: express.Express) {
-  const clientDistPath = path.resolve(process.cwd(), 'dist');
+  // Check multiple possible locations for the dist directory
+  const possiblePaths = [
+    path.resolve(process.cwd(), 'dist'),
+    path.resolve(process.cwd(), 'build'),
+    '/opt/render/project/src/dist',
+    '/opt/render/project/dist'
+  ];
   
-  // Log the path we're trying to serve from
-  log(`Attempting to serve static files from: ${clientDistPath}`);
+  log(`Checking possible static file locations...`);
   
-  // Check if the dist directory exists
-  if (fs.existsSync(clientDistPath)) {
+  // Log all possible paths and whether they exist
+  possiblePaths.forEach(path => {
+    log(`Checking path: ${path} - ${fs.existsSync(path) ? 'EXISTS' : 'NOT FOUND'}`);
+  });
+  
+  // Find the first path that exists
+  const clientDistPath = possiblePaths.find(path => fs.existsSync(path));
+  
+  if (clientDistPath) {
+    log(`Found static files at: ${clientDistPath}`);
+    
+    // List files in the directory for debugging
+    try {
+      const files = fs.readdirSync(clientDistPath);
+      log(`Files in ${clientDistPath}: ${files.join(', ')}`);
+    } catch (err) {
+      log(`Error reading directory: ${err}`);
+    }
+    
     app.use(express.static(clientDistPath, {
       setHeaders: (res, filePath) => {
         if (path.extname(filePath) === '.js') {
@@ -95,21 +118,19 @@ export function serveStatic(app: express.Express) {
           res.sendFile(indexPath);
         } else {
           log(`Warning: index.html not found at ${indexPath}`);
-          res.status(404).send('Application files not found. Please build the application first.');
+          res.status(404).send('Application files not found. Please check build configuration.');
         }
       } else {
         next();
       }
     });
-    
-    log(`Static files being served from ${clientDistPath}`);
   } else {
-    log(`Warning: Static files directory not found at ${clientDistPath}`);
+    log(`Warning: Could not find static files directory in any expected location`);
     
     // Add a fallback route for non-API routes when dist doesn't exist
     app.get('*', (req, res, next) => {
       if (!req.path.startsWith('/api')) {
-        res.status(404).send('Application files not found. Please build the application first.');
+        res.status(404).send('Application files not found. Please check build configuration.');
       } else {
         next();
       }
