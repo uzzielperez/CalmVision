@@ -73,6 +73,7 @@ export async function setupVite(app: Express, server: Server) {
 // Update the serveStatic function to handle missing files
 // Update the serveStatic function to handle Render's environment
 // Update the serveStatic function to prioritize the correct directory
+// Update the serveStatic function to handle JavaScript files correctly
 export function serveStatic(app: express.Express) {
   // Check multiple possible locations for the static files directory
   const possiblePaths = [
@@ -85,13 +86,6 @@ export function serveStatic(app: express.Express) {
     '/opt/render/project/dist'
   ];
   
-  log(`Checking possible static file locations...`);
-  
-  // Log all possible paths and whether they exist
-  possiblePaths.forEach(dirPath => {
-    log(`Checking path: ${dirPath} - ${fs.existsSync(dirPath) ? 'EXISTS' : 'NOT FOUND'}`);
-  });
-  
   // Find the first path that exists AND contains index.html
   let clientDistPath = null;
   for (const dirPath of possiblePaths) {
@@ -101,8 +95,6 @@ export function serveStatic(app: express.Express) {
         clientDistPath = dirPath;
         log(`Found index.html at: ${indexPath}`);
         break;
-      } else {
-        log(`Directory exists but no index.html found at: ${indexPath}`);
       }
     }
   }
@@ -110,7 +102,6 @@ export function serveStatic(app: express.Express) {
   // If no path with index.html was found, use the first existing path
   if (!clientDistPath) {
     clientDistPath = possiblePaths.find(dirPath => fs.existsSync(dirPath));
-    log(`No directory with index.html found, using: ${clientDistPath}`);
   }
   
   if (clientDistPath) {
@@ -120,9 +111,23 @@ export function serveStatic(app: express.Express) {
     try {
       const files = fs.readdirSync(clientDistPath);
       log(`Files in ${clientDistPath}: ${files.join(', ')}`);
+      
+      // Check for assets directory
+      const assetsPath = path.join(clientDistPath, 'assets');
+      if (fs.existsSync(assetsPath)) {
+        const assetFiles = fs.readdirSync(assetsPath);
+        log(`Files in assets: ${assetFiles.join(', ')}`);
+      }
     } catch (err) {
       log(`Error reading directory: ${err}`);
     }
+    
+    // Important: Serve JavaScript files with correct MIME type
+    app.get('*.js', (req, res, next) => {
+      // Set the correct MIME type for JavaScript files
+      res.set('Content-Type', 'application/javascript');
+      next();
+    });
     
     // Serve static files from the directory
     app.use(express.static(clientDistPath, {
@@ -136,23 +141,34 @@ export function serveStatic(app: express.Express) {
     // Check for assets directory and serve it too
     const assetsPath = path.join(clientDistPath, 'assets');
     if (fs.existsSync(assetsPath)) {
-      log(`Found assets directory at: ${assetsPath}`);
-      app.use('/assets', express.static(assetsPath));
+      app.use('/assets', express.static(assetsPath, {
+        setHeaders: (res, filePath) => {
+          if (path.extname(filePath) === '.js') {
+            res.setHeader('Content-Type', 'application/javascript');
+          }
+        }
+      }));
     }
     
-    // Serve index.html for client-side routing
+    // Serve index.html for client-side routing - but only for non-asset routes
     app.get('*', (req, res, next) => {
-      if (!req.path.startsWith('/api')) {
-        const indexPath = path.join(clientDistPath, 'index.html');
-        if (fs.existsSync(indexPath)) {
-          log(`Serving index.html from: ${indexPath}`);
-          res.sendFile(indexPath);
-        } else {
-          log(`Warning: index.html not found at ${indexPath}`);
-          res.status(404).send('Application files not found. Please check build configuration.');
-        }
+      // Skip API routes
+      if (req.path.startsWith('/api')) {
+        return next();
+      }
+      
+      // Skip asset files
+      if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+        return next();
+      }
+      
+      const indexPath = path.join(clientDistPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        log(`Serving index.html for route: ${req.path}`);
+        res.sendFile(indexPath);
       } else {
-        next();
+        log(`Warning: index.html not found at ${indexPath}`);
+        res.status(404).send('Application files not found.');
       }
     });
   } else {
