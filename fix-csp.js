@@ -13,7 +13,7 @@ const htmlContent = `<!DOCTYPE html>
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="/assets/index.js"></script>
+  <script type="module" src="/dist/index.js"></script>
 </body>
 </html>`;
 
