@@ -1,15 +1,8 @@
 import express from "express";
 import fs from 'fs';
-import path, { dirname } from "path";
-import { fileURLToPath } from "url";
-import { createServer as createViteServer, createLogger } from "vite";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-import viteConfig from "../vite.config";
-import { nanoid } from "nanoid";
+import path from "path";
 
-const viteLogger = createLogger();
-
+// Assuming log function is defined as in your original script
 export function log(message, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -20,51 +13,41 @@ export function log(message, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export async function setupVite(app, server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true,
-  };
-
-  const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      },
-    },
-    server: serverOptions,
-    appType: "custom",
-  });
-
-  app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
-    try {
-      const clientTemplate = path.resolve(__dirname, "..", "client", "index.html");
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e);
-      next(e);
-    }
-  });
-}
-
 export function serveStatic(app) {
-  const clientDistPath = path.resolve(process.cwd(), 'server', 'public');
-  
-  if (!fs.existsSync(clientDistPath)) {
-    log(`Error: Static files directory not found at ${clientDistPath}`);
+  // Possible locations for static files
+  const possibleDistPaths = [
+    path.resolve(process.cwd(), 'server', 'public'), // ./server/public
+    path.resolve(process.cwd(), 'dist'), // ./dist
+    '/opt/render/project/src/server/public', // Render-specific path
+    '/opt/render/project/src/dist', // Render-specific dist path
+  ];
+
+  let clientDistPath = null;
+  let assetsPath = null;
+
+  // Find the first valid directory containing index.html
+  for (const dirPath of possibleDistPaths) {
+    if (fs.existsSync(dirPath)) {
+      const indexPath = path.join(dirPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        clientDistPath = dirPath;
+        log(`Found index.html at: ${indexPath}`);
+        // Check for assets directory
+        const potentialAssetsPath = path.join(dirPath, 'assets');
+        if (fs.existsSync(potentialAssetsPath)) {
+          assetsPath = potentialAssetsPath;
+          log(`Found assets directory at: ${assetsPath}`);
+        } else {
+          log(`Assets directory not found at: ${potentialAssetsPath}`);
+        }
+        break;
+      }
+    }
+  }
+
+  // If no valid directory is found, log error and set up fallback
+  if (!clientDistPath) {
+    log(`Error: No static files directory found in: ${possibleDistPaths.join(', ')}`);
     app.get('*', (req, res, next) => {
       if (!req.path.startsWith('/api')) {
         res.status(404).send('Application files not found. Please check build configuration.');
@@ -76,26 +59,24 @@ export function serveStatic(app) {
   }
 
   log(`Serving static files from: ${clientDistPath}`);
-  
-  // Log available files for debugging
+
+  // Log directory contents for debugging
   try {
     const files = fs.readdirSync(clientDistPath);
     log(`Files in ${clientDistPath}: ${files.join(', ')}`);
-    const assetsPath = path.join(clientDistPath, 'assets');
-    if (fs.existsSync(assetsPath)) {
+    if (assetsPath) {
       const assetFiles = fs.readdirSync(assetsPath);
-      log(`Files in assets: ${assetFiles.join(', ')}`);
+      log(`Files in ${assetsPath}: ${assetFiles.join(', ')}`);
     }
   } catch (err) {
-    log(`Error reading directory: ${err}`);
+    log(`Error reading directory ${clientDistPath}: ${err}`);
   }
 
-  // Handle requests for /dist/index.js by finding the hashed JS file
+  // Handle /dist/index.js by finding the hashed JS file in assets
   app.get('/dist/index.js', (req, res) => {
-    const assetsPath = path.join(clientDistPath, 'assets');
-    if (!fs.existsSync(assetsPath)) {
-      log(`Assets directory not found at: ${assetsPath}`);
-      res.status(404).send('File not found');
+    if (!assetsPath) {
+      log(`Cannot serve /dist/index.js: Assets directory not found`);
+      res.status(404).send('Assets directory not found');
       return;
     }
 
@@ -103,8 +84,8 @@ export function serveStatic(app) {
       const assetFiles = fs.readdirSync(assetsPath);
       const mainJsFile = assetFiles.find(file => file.startsWith('index-') && file.endsWith('.js'));
       if (!mainJsFile) {
-        log(`No hashed index.js file found in ${assetsPath}`);
-        res.status(404).send('File not found');
+        log(`No hashed index.js file found in ${assetsPath}. Available files: ${assetFiles.join(', ')}`);
+        res.status(404).send('JavaScript file not found');
         return;
       }
 
@@ -113,19 +94,21 @@ export function serveStatic(app) {
       res.set('Content-Type', 'application/javascript');
       res.sendFile(jsPath);
     } catch (err) {
-      log(`Error reading assets directory: ${err}`);
-      res.status(404).send('File not found');
+      log(`Error reading assets directory ${assetsPath}: ${err}`);
+      res.status(404).send('Error accessing JavaScript file');
     }
   });
 
   // Serve assets directly
-  app.use('/assets', express.static(path.join(clientDistPath, 'assets'), {
-    setHeaders: (res, filePath) => {
-      if (path.extname(filePath) === '.js') {
-        res.setHeader('Content-Type', 'application/javascript');
+  if (assetsPath) {
+    app.use('/assets', express.static(assetsPath, {
+      setHeaders: (res, filePath) => {
+        if (path.extname(filePath) === '.js') {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
       }
-    }
-  }));
+    }));
+  }
 
   // Serve other static files
   app.use(express.static(clientDistPath, {
