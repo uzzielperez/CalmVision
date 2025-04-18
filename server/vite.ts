@@ -391,6 +391,10 @@ export function serveStatic(app: express.Express) {
           const assetsPath = path.join(clientDistPath, 'assets');
           const alternativeAssetsPath = path.join(process.cwd(), 'dist', 'public', 'assets');
           
+          // Hardcode the exact filenames from the build output
+          const mainJsFile = 'index-Fms9jRiH.js';
+          const mainCssFile = 'index-DYIp0JvB.css';
+          
           let actualAssetsPath = null;
           if (fs.existsSync(assetsPath)) {
             actualAssetsPath = assetsPath;
@@ -400,44 +404,34 @@ export function serveStatic(app: express.Express) {
           }
           
           if (actualAssetsPath) {
-            const assetFiles = fs.readdirSync(actualAssetsPath);
-            log(`Available asset files: ${assetFiles.join(', ')}`);
+            // Create a modified version of the HTML with the correct script path
+            let modifiedHtml = htmlContent;
             
-            const mainJsFile = assetFiles.find(file => file.endsWith('.js') && file.includes('index-'));
-            const mainCssFile = assetFiles.find(file => file.endsWith('.css') && file.includes('index-'));
+            // Add both JS and CSS files
+            let scriptsAdded = false;
             
-            if (mainJsFile) {
-              log(`Found main JS file for HTML: ${mainJsFile}`);
-              
-              // Create a modified version of the HTML with the correct script path
-              let modifiedHtml = htmlContent;
-              
-              // Add both JS and CSS files
-              let scriptsAdded = false;
-              
-              // Replace any references to /dist/index.js with the correct path
-              if (modifiedHtml.includes('/dist/index.js')) {
-                log(`Replacing /dist/index.js with /assets/${mainJsFile} in index.html`);
-                modifiedHtml = modifiedHtml.replace('/dist/index.js', `/assets/${mainJsFile}`);
-                scriptsAdded = true;
-              }
-              
-              // Add CSS if needed
-              if (mainCssFile && !modifiedHtml.includes(mainCssFile)) {
-                log(`Adding CSS link for ${mainCssFile}`);
-                modifiedHtml = modifiedHtml.replace('</head>', `<link rel="stylesheet" href="/assets/${mainCssFile}"></head>`);
-              }
-              
-              // If we couldn't find any script tags to replace, add our own
-              if (!scriptsAdded) {
-                log(`Adding script tag for ${mainJsFile}`);
-                modifiedHtml = modifiedHtml.replace('</head>', `<script type="module" src="/assets/${mainJsFile}"></script></head>`);
-              }
-              
-              // Send the modified HTML
-              res.set('Content-Type', 'text/html');
-              return res.send(modifiedHtml);
+            // Replace any references to /dist/index.js with the correct path
+            if (modifiedHtml.includes('/dist/index.js')) {
+              log(`Replacing /dist/index.js with /assets/${mainJsFile} in index.html`);
+              modifiedHtml = modifiedHtml.replace('/dist/index.js', `/assets/${mainJsFile}`);
+              scriptsAdded = true;
             }
+            
+            // Add CSS if needed
+            if (!modifiedHtml.includes(mainCssFile)) {
+              log(`Adding CSS link for ${mainCssFile}`);
+              modifiedHtml = modifiedHtml.replace('</head>', `<link rel="stylesheet" href="/assets/${mainCssFile}"></head>`);
+            }
+            
+            // If we couldn't find any script tags to replace, add our own
+            if (!scriptsAdded) {
+              log(`Adding script tag for ${mainJsFile}`);
+              modifiedHtml = modifiedHtml.replace('</head>', `<script type="module" src="/assets/${mainJsFile}"></script></head>`);
+            }
+            
+            // Send the modified HTML
+            res.set('Content-Type', 'text/html');
+            return res.send(modifiedHtml);
           }
         } catch (err) {
           log(`Error modifying index.html: ${err}`);
