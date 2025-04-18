@@ -1,0 +1,1 @@
+require('tsx/cjs').load('./server/index.ts');
