@@ -130,6 +130,46 @@ export function serveStatic(app: express.Express) {
             res.set('Content-Type', 'application/javascript');
             res.sendFile(jsPath);
           });
+        } else {
+          // Assets directory exists but no main JS file found
+          log(`Assets directory exists but is empty or missing main JS file`);
+          
+          // Create a fallback JS file in the assets directory
+          const fallbackJsPath = path.join(assetsPath, 'index-fallback.js');
+          const fallbackJs = `
+            console.log("Loading fallback JavaScript file");
+            // Initialize the application with minimal functionality
+            window.addEventListener('DOMContentLoaded', () => {
+              document.body.innerHTML = '<div style="padding: 40px; font-family: system-ui, sans-serif;">' +
+                '<h1>CalmVision</h1>' +
+                '<p>The application assets could not be loaded properly.</p>' +
+                '<p>This could be due to a build issue or missing files.</p>' +
+                '<div style="padding: 20px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; margin: 20px 0;">Error: Main JavaScript file not found in assets directory</div>' +
+                '<p>Please check the build configuration and deployment process.</p>' +
+                '</div>';
+            });
+          `;
+          
+          try {
+            fs.writeFileSync(fallbackJsPath, fallbackJs);
+            log(`Created fallback JS file at: ${fallbackJsPath}`);
+            
+            // Add a route to serve this file
+            app.get('/dist/index.js', (req, res) => {
+              log(`Serving fallback JS file from assets directory`);
+              res.set('Content-Type', 'application/javascript');
+              res.sendFile(fallbackJsPath);
+            });
+          } catch (err) {
+            log(`Error creating fallback JS file: ${err}`);
+            
+            // If we can't create the file, serve the JS directly
+            app.get('/dist/index.js', (req, res) => {
+              log(`Serving inline fallback JS`);
+              res.set('Content-Type', 'application/javascript');
+              res.send(fallbackJs);
+            });
+          }
         }
       } else {
         log(`Assets directory not found at: ${assetsPath}`);
