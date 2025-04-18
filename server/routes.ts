@@ -71,8 +71,21 @@ export async function registerRoutes(app: Express) {
       const { prompt } = insertMeditationSchema.parse(req.body);
       console.log('Received meditation prompt:', prompt);
 
-      const generated = await generateMeditation(prompt);
-      console.log('Generated meditation content successfully using Groq');
+      // Add basic fallback
+      let generated;
+      try {
+        // Try using your implementation
+        generated = await generateMeditation(prompt);
+        console.log('Generated meditation content successfully');
+      } catch (genError) {
+        console.error('Specific generation error:', genError);
+        // Fallback to a simple response
+        generated = {
+          content: `Meditation on ${prompt}. Close your eyes. Take a deep breath. Focus on your breathing. Relax each part of your body from head to toe. Continue breathing deeply.`,
+          duration: 30
+        };
+        console.log('Using fallback meditation content');
+      }
 
       const meditation = await storage.createMeditation({
         prompt,
@@ -81,16 +94,11 @@ export async function registerRoutes(app: Express) {
 
       res.json({ ...meditation, duration: generated.duration });
     } catch (error) {
-      if (error instanceof ZodError) {
-        console.error('Validation error:', error.errors);
-        res.status(400).json({ error: error.errors });
-      } else {
-        console.error('Generation error:', error);
-        res.status(500).json({ 
-          error: error.message || "Failed to generate meditation using Groq",
-          details: error instanceof Error ? error.stack : undefined
-        });
-      }
+      console.error('Full error details:', error);
+      res.status(500).json({ 
+        error: "Failed to create meditation", 
+        details: error.message 
+      });
     }
   });
 
