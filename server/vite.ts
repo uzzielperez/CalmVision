@@ -121,6 +121,7 @@ export function serveStatic(app: express.Express) {
     } catch (err) {
       log(`Error reading directory: ${err}`);
     }    
+    
     // Fix: Check multiple locations for JS files
     app.get('/dist/*.js', (req, res) => {
       const requestedFile = req.path.replace('/dist/', '');
@@ -135,7 +136,28 @@ export function serveStatic(app: express.Express) {
       ];
       
       // Find the first location that exists
-      const jsPath = possibleJsLocations.find(p => fs.existsSync(p));
+      let jsPath = possibleJsLocations.find(p => fs.existsSync(p));
+      
+      // If not found, check for hashed files in assets directory
+      if (!jsPath && fs.existsSync(path.join(clientDistPath, 'assets'))) {
+        try {
+          const assetFiles = fs.readdirSync(path.join(clientDistPath, 'assets'));
+          log(`Checking assets directory for JS files: ${assetFiles.join(', ')}`);
+          
+          // Look for files that match the pattern (e.g., index-[hash].js)
+          const baseFileName = requestedFile.replace('.js', '');
+          const matchingFile = assetFiles.find(file => 
+            file.startsWith(baseFileName + '-') && file.endsWith('.js')
+          );
+          
+          if (matchingFile) {
+            jsPath = path.join(clientDistPath, 'assets', matchingFile);
+            log(`Found matching hashed JS file: ${matchingFile}`);
+          }
+        } catch (err) {
+          log(`Error reading assets directory: ${err}`);
+        }
+      }
       
       if (jsPath) {
         log(`Found JS file at: ${jsPath}`);
