@@ -7,6 +7,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Serve static files
+if (app.get("env") !== "development") {
+  app.use(express.static('dist')); // Ensure 'dist' is the correct directory for static files
+}
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
