@@ -30,6 +30,7 @@ const voiceMap: Record<string, string> = {
 type ElevenLabsVoice = { voice_id: string; name: string };
 type OpenAIVoice = { id: string; name: string };
 type GroqVoice = { id: string; name: string };
+type PlayAIVoice = { id: string; name: string };
 
 // Function to clean up text before sending to TTS
 export function cleanupTextForAudio(text: string): string {
@@ -68,7 +69,7 @@ export async function synthesizeSpeech(
   const cleanedText = cleanupTextForAudio(text);
   
   // Try ElevenLabs if configured
-  if (process.env.ELEVENLABS_API_KEY && !voiceId.startsWith('openai_') && !voiceId.startsWith('groq_')) {
+  if (process.env.ELEVENLABS_API_KEY && !voiceId.startsWith('openai_') && !voiceId.startsWith('groq_') && !voiceId.startsWith('playai_')) {
     try {
       console.log("Attempting ElevenLabs TTS...");
       return await synthesizeWithElevenLabs(cleanedText, voiceId);
@@ -79,7 +80,7 @@ export async function synthesizeSpeech(
   }
   
   // Try OpenAI if configured
-  if (process.env.OPENAI_API_KEY && (!voiceId.startsWith('groq_') || voiceId.startsWith('openai_'))) {
+  if (process.env.OPENAI_API_KEY && (!voiceId.startsWith('groq_') && !voiceId.startsWith('playai_') || voiceId.startsWith('openai_'))) {
     const openaiVoiceId = voiceId.startsWith('openai_') 
       ? voiceId.replace('openai_', '') 
       : mapElevenLabsToOpenAI(voiceId);
@@ -94,7 +95,7 @@ export async function synthesizeSpeech(
   }
   
   // Try Groq if configured
-  if (process.env.GROQ_API_KEY) {
+  if (process.env.GROQ_API_KEY && (!voiceId.startsWith('playai_') || voiceId.startsWith('groq_'))) {
     const groqModel = voiceId.startsWith('groq_') 
       ? voiceId.replace('groq_', '') 
       : 'playai-tts-arabic';  // Default model
@@ -104,6 +105,20 @@ export async function synthesizeSpeech(
       return await synthesizeWithGroq(cleanedText, groqModel);
     } catch (error) {
       console.error("Groq TTS failed:", error);
+    }
+  }
+  
+  // Try PlayAI if configured
+  if (process.env.PLAYAI_API_KEY) {
+    const playaiVoiceId = voiceId.startsWith('playai_') 
+      ? voiceId.replace('playai_', '') 
+      : 'en-US-Female-1';  // Default voice
+      
+    try {
+      console.log("Attempting PlayAI TTS...");
+      return await synthesizeWithPlayAI(cleanedText, playaiVoiceId);
+    } catch (error) {
+      console.error("PlayAI TTS failed:", error);
     }
   }
   
@@ -229,6 +244,43 @@ async function synthesizeWithGroq(text: string, model: string): Promise<Buffer> 
   return Buffer.from(await response.arrayBuffer());
 }
 
+// Update the synthesizeWithPlayAI function to include user_id if available
+async function synthesizeWithPlayAI(text: string, voiceId: string): Promise<Buffer> {
+  if (!process.env.PLAYAI_API_KEY) {
+    throw new Error("PLAYAI_API_KEY is not configured");
+  }
+
+  const url = "https://api.play.ai/v1/tts/synthesis";
+  
+  const requestBody: any = {
+    text: text,
+    voice_id: voiceId,
+    model: "playdialog",  // Using their advanced model
+    output_format: "mp3"
+  };
+  
+  // Add user_id if available
+  if (process.env.PLAYAI_USER_ID) {
+    requestBody.user_id = process.env.PLAYAI_USER_ID;
+  }
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.PLAYAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`PlayAI API error: ${response.status} ${errorText}`);
+  }
+
+  return Buffer.from(await response.arrayBuffer());
+}
+
 // Voice mapping function
 function mapElevenLabsToOpenAI(elevenLabsVoiceId: string): string {
   // Map ElevenLabs voices to the closest OpenAI voice
@@ -261,6 +313,58 @@ export async function listVoices(): Promise<Array<{ id: string; name: string }>>
   
   console.log("Adding default voices:", defaultVoices.length);
   voices = [...defaultVoices];
+  
+  // Try to add PlayAI voices if configured
+  if (process.env.PLAYAI_API_KEY) {
+    console.log("PlayAI API key found, attempting to fetch voices...");
+    try {
+      // Add query param for user_id if available
+      const userIdParam = process.env.PLAYAI_USER_ID ? `?user_id=${process.env.PLAYAI_USER_ID}` : '';
+      const response = await fetch(`https://api.play.ai/v1/tts/voices${userIdParam}`, {
+        headers: {
+          'Authorization': `Bearer ${process.env.PLAYAI_API_KEY}`,
+        },
+      });
+      
+      console.log("PlayAI API response status:", response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("PlayAI data received, has voices:", !!data.voices);
+        
+        if (data.voices && Array.isArray(data.voices)) {
+          const playaiVoices = data.voices.map((voice: any) => ({
+            id: `playai_${voice.voice_id}`,
+            name: `PlayAI ${voice.name}`,
+          }));
+          console.log(`Found ${playaiVoices.length} PlayAI voices`);
+          voices.push(...playaiVoices);
+        }
+      } else {
+        // If API doesn't work, add some default PlayAI voices
+        const playaiVoices = [
+          { id: "playai_en-US-Female-1", name: "PlayAI English Female 1" },
+          { id: "playai_en-US-Male-1", name: "PlayAI English Male 1" },
+          { id: "playai_ar-SA-Female-1", name: "PlayAI Arabic Female 1" },
+          { id: "playai_ar-SA-Male-1", name: "PlayAI Arabic Male 1" }
+        ];
+        voices.push(...playaiVoices);
+        console.log("Added static PlayAI voices:", playaiVoices.length);
+      }
+    } catch (error) {
+      console.error("Network error fetching PlayAI voices:", error);
+      
+      // Add static voices on error
+      const playaiVoices = [
+        { id: "playai_en-US-Female-1", name: "PlayAI English Female 1" },
+        { id: "playai_en-US-Male-1", name: "PlayAI English Male 1" },
+        { id: "playai_ar-SA-Female-1", name: "PlayAI Arabic Female 1" },
+        { id: "playai_ar-SA-Male-1", name: "PlayAI Arabic Male 1" }
+      ];
+      voices.push(...playaiVoices);
+      console.log("Added static PlayAI voices after error:", playaiVoices.length);
+    }
+  }
   
   // Try to add ElevenLabs voices if configured
   if (process.env.ELEVENLABS_API_KEY) {

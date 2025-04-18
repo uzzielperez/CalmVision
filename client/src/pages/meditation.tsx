@@ -18,12 +18,8 @@ interface MeditationResponse extends Meditation {
 }
 
 interface Voice {
-  voice_id: string;
+  id: string;
   name: string;
-}
-
-interface VoicesResponse {
-  voices: Voice[];
 }
 
 function cleanupTextForDisplay(text: string): string {
@@ -79,11 +75,11 @@ export default function Meditation() {
   });
 
   // Fetch available voices
-  const { data: voicesResponse, isLoading: voicesLoading } = useQuery<VoicesResponse>({
+  const { data: voices, isLoading: voicesLoading } = useQuery<Voice[]>({
     queryKey: ['/api/voices'],
   });
 
-  const voices = voicesResponse?.voices || [];
+  const voicesList = voices || [];
 
   // Initialize audio
   const audio = useAudio(
@@ -281,7 +277,7 @@ export default function Meditation() {
         <Card className="p-4">
           <CardContent className="p-0">
             <VoiceSelector
-              voices={voices}
+              voices={voicesList}
               selectedVoiceId={selectedVoiceId}
               onVoiceChange={(voiceId) => {
                 audio.stop();
