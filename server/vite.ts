@@ -77,5 +77,14 @@ export function serveStatic(app: Express.Application) {
     throw new Error(`Could not find the build directory: ${publicDir}, make sure to build the client first`);
   }
   
+  // Add CSP headers
+  app.use((req, res, next) => {
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss: https:;"
+    );
+    next();
+  });
+  
   app.use(express.static(publicDir));
 }
