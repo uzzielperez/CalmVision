@@ -5,11 +5,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "rm -rf server/public && vite build && cp setup-db.js server/public/ && cp fix-csp.js server/public/",
+    "build": "rm -rf server/public && vite build && mkdir -p server/public/assets && { [ -d dist/assets ] && cp -r dist/assets/* server/public/assets/ || true; } && { [ -f dist/index.html ] && cp dist/index.html server/public/ || true; } && cp setup-db.js server/public/ && cp fix-csp.js server/public/ && echo 'Build complete. Directory structure:' && tree server/public",
     "migrate": "cd dist && node --experimental-modules migrate.js",
     "start": "node setup-db.js && node fix-csp.js && tsx server/index.ts",
     "check": "tsc",
-    "pg-version": "node -e \"const { neon } = require('@neondatabase/serverless'); const sql = neon(process.env.DATABASE_URL); sql`SELECT version()`.then(r => console.log(r[0].version)).catch(console.error)\""
+    "pg-version": "node -e \"const { neon } = require('@neondatabase/serverless'); const sql = neon(process.env.DATABASE_URL); sql`SELECT version()`.then(r => console.log(r[0].version)).catch(console.error)\"",
+    "debug": "node -e \"const fs = require('fs'); console.log('Server public directory contents:', fs.readdirSync('./server/public')); console.log('Dist directory contents:', fs.readdirSync('./dist'))\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
