@@ -6,7 +6,7 @@ import { relations } from "drizzle-orm";
 export const meditations = pgTable("meditations", {
   id: serial("id").primaryKey(),
   prompt: text("prompt").notNull(),
-  content: text("content").notNull(),
+  content: text("content"), //remove not null
   rating: integer("rating"), // Rating from 1-5
   createdAt: timestamp("created_at").defaultNow(),
 });
