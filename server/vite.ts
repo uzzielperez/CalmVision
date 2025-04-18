@@ -118,6 +118,22 @@ export function serveStatic(app: express.Express) {
         const assetFiles = fs.readdirSync(assetsPath);
         log(`Files in assets: ${assetFiles.join(', ')}`);
         
+        // Add a direct route for /dist/index.js to the known file
+        app.get('/dist/index.js', (req, res) => {
+          const exactJsFile = 'index-Fms9jRiH.js';
+          log(`Serving exact JS file: ${exactJsFile}`);
+          
+          const jsPath = path.join(clientDistPath, 'assets', exactJsFile);
+          if (fs.existsSync(jsPath)) {
+            res.set('Content-Type', 'application/javascript');
+            res.sendFile(jsPath);
+          } else {
+            log(`Exact JS file not found at: ${jsPath}`);
+            res.status(404).send('File not found');
+          }
+        });
+      }
+        
         // Find the main JS file in assets
         const mainJsFile = assetFiles.find(file => file.endsWith('.js') && file.includes('index-'));
         if (mainJsFile) {
