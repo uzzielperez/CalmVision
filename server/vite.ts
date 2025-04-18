@@ -98,10 +98,19 @@ export function serveStatic(app: express.Express) {
     try {
       const files = fs.readdirSync(clientDistPath);
       log(`Files in ${clientDistPath}: ${files.join(', ')}`);
+      
+      // Check if public directory exists
+      const publicPath = path.join(clientDistPath, 'public');
+      if (fs.existsSync(publicPath)) {
+        log(`Found public directory at: ${publicPath}`);
+        const publicFiles = fs.readdirSync(publicPath);
+        log(`Files in public directory: ${publicFiles.join(', ')}`);
+      }
     } catch (err) {
       log(`Error reading directory: ${err}`);
     }
     
+    // Serve static files from the dist directory
     app.use(express.static(clientDistPath, {
       setHeaders: (res, filePath) => {
         if (path.extname(filePath) === '.js') {
@@ -110,14 +119,28 @@ export function serveStatic(app: express.Express) {
       }
     }));
     
+    // Also serve files from the public subdirectory if it exists
+    const publicPath = path.join(clientDistPath, 'public');
+    if (fs.existsSync(publicPath)) {
+      app.use(express.static(publicPath));
+    }
+    
     // Serve index.html for client-side routing
     app.get('*', (req, res, next) => {
       if (!req.path.startsWith('/api')) {
-        const indexPath = path.join(clientDistPath, 'index.html');
+        // First check for index.html in the root dist directory
+        let indexPath = path.join(clientDistPath, 'index.html');
+        
+        // If not found, check in the public subdirectory
+        if (!fs.existsSync(indexPath)) {
+          indexPath = path.join(clientDistPath, 'public', 'index.html');
+        }
+        
         if (fs.existsSync(indexPath)) {
+          log(`Serving index.html from: ${indexPath}`);
           res.sendFile(indexPath);
         } else {
-          log(`Warning: index.html not found at ${indexPath}`);
+          log(`Warning: index.html not found in any expected location`);
           res.status(404).send('Application files not found. Please check build configuration.');
         }
       } else {
