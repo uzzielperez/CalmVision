@@ -120,8 +120,7 @@ export function serveStatic(app: express.Express) {
       }
     } catch (err) {
       log(`Error reading directory: ${err}`);
-    }
-dd     
+    }    
     // Fix: Check multiple locations for JS files
     app.get('/dist/*.js', (req, res) => {
       const requestedFile = req.path.replace('/dist/', '');
