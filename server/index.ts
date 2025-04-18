@@ -2,14 +2,30 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupDatabase } from '../db-setup.js';
+import path from 'path';
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Serve static files
+// Set proper MIME types
+app.use((req, res, next) => {
+  if (req.path.endsWith('.js')) {
+    res.type('application/javascript');
+  }
+  next();
+});
+
+// Serve static files with proper configuration
 if (app.get("env") !== "development") {
-  app.use(express.static('dist')); // Ensure 'dist' is the correct directory for static files
+  // Serve from the dist directory with proper MIME types
+  app.use(express.static(path.join(process.cwd(), 'dist'), {
+    setHeaders: (res, filePath) => {
+      if (path.extname(filePath) === '.js') {
+        res.setHeader('Content-Type', 'application/javascript');
+      }
+    }
+  }));
 }
 
 app.use((req, res, next) => {
@@ -44,7 +60,12 @@ app.use((req, res, next) => {
 
 async function startServer() {
   // Run database migrations/setup
-  await setupDatabase();
+  try {
+    await setupDatabase();
+  } catch (error) {
+    console.error('Database setup error:', error);
+    // Continue even if database setup fails
+  }
   
   const server = await registerRoutes(app);
 
@@ -63,6 +84,11 @@ async function startServer() {
     await setupVite(app, server);
   } else {
     serveStatic(app);
+    
+    // Add a catch-all route to serve index.html for client-side routing
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+    });
   }
 
   // ALWAYS serve the app on port 5000
