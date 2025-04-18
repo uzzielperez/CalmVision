@@ -114,19 +114,29 @@ export function serveStatic(app: express.Express) {
       
       // Check for assets directory
       const assetsPath = path.join(clientDistPath, 'assets');
+      const alternativeAssetsPath = path.join(process.cwd(), 'dist', 'public', 'assets');
+      
+      let actualAssetsPath = null;
       if (fs.existsSync(assetsPath)) {
-        const assetFiles = fs.readdirSync(assetsPath);
-        log(`Files in assets: ${assetFiles.join(', ')}`);
+        actualAssetsPath = assetsPath;
+      } else if (fs.existsSync(alternativeAssetsPath)) {
+        actualAssetsPath = alternativeAssetsPath;
+        log(`Found assets in alternative location: ${alternativeAssetsPath}`);
+      }
+      
+      if (actualAssetsPath) {
+        const assetFiles = fs.readdirSync(actualAssetsPath);
+        log(`Available asset files: ${assetFiles.join(', ')}`);
         
-        // Find the main JS file in assets
         const mainJsFile = assetFiles.find(file => file.endsWith('.js') && file.includes('index-'));
+        
         if (mainJsFile) {
           log(`Found main JS file: ${mainJsFile}`);
           
           // Add a direct route for /dist/index.js to serve the actual file
           app.get('/dist/index.js', (req, res) => {
             log(`Serving main JS file: ${mainJsFile}`);
-            const jsPath = path.join(assetsPath, mainJsFile);
+            const jsPath = path.join(actualAssetsPath, mainJsFile);
             res.set('Content-Type', 'application/javascript');
             res.sendFile(jsPath);
           });
@@ -263,7 +273,8 @@ export function serveStatic(app: express.Express) {
         path.join(clientDistPath, requestedFile),                // server/public/index.js
         path.join('/opt/render/project/src/dist', requestedFile), // dist/index.js
         path.join(process.cwd(), 'dist', requestedFile),         // ./dist/index.js
-        path.join(clientDistPath, 'assets', requestedFile)       // server/public/assets/index.js
+        path.join(clientDistPath, 'assets', requestedFile),      // server/public/assets/index.js
+        path.join(process.cwd(), 'dist', 'public', 'assets', requestedFile) // dist/public/assets/index.js
       ];
       
       // Find the first location that exists
