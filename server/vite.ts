@@ -122,11 +122,32 @@ export function serveStatic(app: express.Express) {
       log(`Error reading directory: ${err}`);
     }
     
-    // Important: Serve JavaScript files with correct MIME type
-    app.get('*.js', (req, res, next) => {
-      // Set the correct MIME type for JavaScript files
-      res.set('Content-Type', 'application/javascript');
-      next();
+    // Fix: Use a more specific pattern for JavaScript files
+    app.get('/dist/*.js', (req, res) => {
+      const jsPath = path.join(clientDistPath, req.path.replace('/dist/', ''));
+      log(`Serving JS file from: ${jsPath}`);
+      
+      if (fs.existsSync(jsPath)) {
+        res.set('Content-Type', 'application/javascript');
+        res.sendFile(jsPath);
+      } else {
+        log(`JS file not found: ${jsPath}`);
+        res.status(404).send('File not found');
+      }
+    });
+    
+    // Also handle assets JS files
+    app.get('/assets/*.js', (req, res) => {
+      const jsPath = path.join(clientDistPath, req.path);
+      log(`Serving asset JS file from: ${jsPath}`);
+      
+      if (fs.existsSync(jsPath)) {
+        res.set('Content-Type', 'application/javascript');
+        res.sendFile(jsPath);
+      } else {
+        log(`Asset JS file not found: ${jsPath}`);
+        res.status(404).send('File not found');
+      }
     });
     
     // Serve static files from the directory
