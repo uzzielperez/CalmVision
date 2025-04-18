@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { setupDatabase } from '../db-setup.js';
 
 const app = express();
 app.use(express.json());
@@ -36,7 +37,10 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+async function startServer() {
+  // Run database migrations/setup
+  await setupDatabase();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -62,4 +66,6 @@ app.use((req, res, next) => {
   server.listen(PORT, "0.0.0.0", () => {
     log(`serving on port ${PORT}`);
   });
-})();
+}
+
+startServer().catch(console.error);

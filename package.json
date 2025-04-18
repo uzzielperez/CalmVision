@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "npm run migrate && node dist/index.js",
+    "start": "node -e \"const fs=require('fs'); const path=require('path'); const { neon } = require('@neondatabase/serverless'); const sql = neon(process.env.DATABASE_URL); sql`ALTER TABLE meditations ADD COLUMN IF NOT EXISTS model TEXT;`.then(() => console.log('Migration successful')).catch(e => console.error('Migration failed:', e)).then(() => require('./dist/index.js'));\"",
     "check": "tsc",
-    "db:push": "drizzle-kit push",
-    "migrate": "drizzle-kit push"
+    "db:migrate": "tsx migrate.ts",
+    "prepare-deploy": "npm run db:migrate"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
