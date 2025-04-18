@@ -244,18 +244,19 @@ async function synthesizeWithGroq(text: string, model: string): Promise<Buffer> 
   return Buffer.from(await response.arrayBuffer());
 }
 
-// Update the synthesizeWithPlayAI function to include user_id if available
+// Update the synthesizeWithPlayAI function with the correct endpoint
 async function synthesizeWithPlayAI(text: string, voiceId: string): Promise<Buffer> {
   if (!process.env.PLAYAI_API_KEY) {
     throw new Error("PLAYAI_API_KEY is not configured");
   }
 
-  const url = "https://api.play.ai/v1/tts/synthesis";
+  // Updated URL based on PlayAI documentation
+  const url = "https://api.play.ai/api/text-to-speech";
   
   const requestBody: any = {
     text: text,
     voice_id: voiceId,
-    model: "playdialog",  // Using their advanced model
+    model: "playdialog",
     output_format: "mp3"
   };
   
@@ -263,6 +264,8 @@ async function synthesizeWithPlayAI(text: string, voiceId: string): Promise<Buff
   if (process.env.PLAYAI_USER_ID) {
     requestBody.user_id = process.env.PLAYAI_USER_ID;
   }
+  
+  console.log("PlayAI request:", JSON.stringify(requestBody, null, 2));
   
   const response = await fetch(url, {
     method: 'POST',
@@ -318,9 +321,9 @@ export async function listVoices(): Promise<Array<{ id: string; name: string }>>
   if (process.env.PLAYAI_API_KEY) {
     console.log("PlayAI API key found, attempting to fetch voices...");
     try {
-      // Add query param for user_id if available
+      // Updated URL based on PlayAI documentation
       const userIdParam = process.env.PLAYAI_USER_ID ? `?user_id=${process.env.PLAYAI_USER_ID}` : '';
-      const response = await fetch(`https://api.play.ai/v1/tts/voices${userIdParam}`, {
+      const response = await fetch(`https://api.play.ai/api/voices${userIdParam}`, {
         headers: {
           'Authorization': `Bearer ${process.env.PLAYAI_API_KEY}`,
         },

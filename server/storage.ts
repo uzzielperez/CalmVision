@@ -18,28 +18,39 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // Create a new meditation
   async createMeditation(meditation: InsertMeditation & { content: string }): Promise<Meditation> {
-    // For development, store in memory
-    if (process.env.NODE_ENV === 'development') {
-      console.log("[MOCK] Creating meditation:", meditation.prompt);
+    try {
+      // For development, store in memory
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[MOCK] Creating meditation:", meditation.prompt);
+        
+        // Create a mock meditation with the actual content
+        lastGeneratedMeditation = {
+          id: Date.now(), // Use timestamp for unique ID
+          prompt: meditation.prompt,
+          content: meditation.content, // Store the actual generated content
+          rating: null,
+          createdAt: new Date()
+        };
+        
+        return lastGeneratedMeditation;
+      }
       
-      // Create a mock meditation with the actual content
-      lastGeneratedMeditation = {
-        id: Date.now(), // Use timestamp for unique ID
-        prompt: meditation.prompt,
-        content: meditation.content, // Store the actual generated content
-        rating: null,
-        createdAt: new Date()
-      };
-      
-      return lastGeneratedMeditation;
+      // Production code
+      const [newMeditation] = await db
+        .insert(meditations)
+        .values(meditation)
+        .returning();
+      return newMeditation;
+    } catch (error) {
+      console.error("Database error details:", {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        sqlState: error.sqlState,
+        query: error.query
+      });
+      throw error;
     }
-    
-    // Production code
-    const [newMeditation] = await db
-      .insert(meditations)
-      .values(meditation)
-      .returning();
-    return newMeditation;
   }
 
   // Get a specific meditation by ID
