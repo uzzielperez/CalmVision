@@ -5,8 +5,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "node -e \"const fs=require('fs'); const path=require('path'); const { neon } = require('@neondatabase/serverless'); const sql = neon(process.env.DATABASE_URL); sql`ALTER TABLE meditations ADD COLUMN IF NOT EXISTS model TEXT;`.then(() => console.log('Migration successful')).catch(e => console.error('Migration failed:', e)).then(() => require('./dist/index.js'));\"",
+    "build": "vite build && esbuild server/index.ts db-setup.js --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "node dist/index.js",
     "check": "tsc",
     "db:migrate": "tsx migrate.ts",
     "prepare-deploy": "npm run db:migrate"
