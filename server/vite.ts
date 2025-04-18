@@ -159,8 +159,32 @@ export function serveStatic(app: express.Express) {
           const parentDir = path.dirname(clientDistPath);
           log(`Starting directory tree from: ${parentDir}`);
           listDir(parentDir);
+          
+          // Create assets directory and basic JS file if it doesn't exist
+          log(`Creating assets directory and basic JS file`);
+          fs.mkdirSync(assetsPath, { recursive: true });
+          
+          const basicJsFile = path.join(assetsPath, 'index-fallback.js');
+          const basicJsContent = `
+            console.log("Loading fallback JavaScript file");
+            // Initialize the application with minimal functionality
+            window.addEventListener('DOMContentLoaded', () => {
+              document.body.innerHTML += '<div style="padding: 20px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; margin: 20px;">Application assets could not be loaded properly. Using fallback mode.</div>';
+            });
+          `;
+          fs.writeFileSync(basicJsFile, basicJsContent);
+          log(`Created fallback JS file at: ${basicJsFile}`);
+          
+          // Add a route to serve this file
+          app.get('/dist/index.js', (req, res) => {
+            log(`Serving fallback JS file: ${basicJsFile}`);
+            res.set('Content-Type', 'application/javascript');
+            res.sendFile(basicJsFile);
+          });
+          
+          return;
         } catch (err) {
-          log(`Error printing directory tree: ${err}`);
+          log(`Error creating assets directory or printing tree: ${err}`);
         }
         
         // Handle /dist/index.js request when assets directory doesn't exist
