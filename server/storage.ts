@@ -2,6 +2,9 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { meditations, type Meditation, type InsertMeditation, type UpdateMeditation } from "@shared/schema"; // Removed journalEntries and related types
 
+// Store the last generated meditation for development mode
+let lastGeneratedMeditation: Meditation | null = null;
+
 export interface IStorage {
   // Meditation methods
   createMeditation(meditation: InsertMeditation & { content: string }): Promise<Meditation>;
@@ -9,21 +12,26 @@ export interface IStorage {
   listMeditations(): Promise<Meditation[]>;
   rateMeditation(id: number, rating: number): Promise<Meditation>;
   deleteMeditation(id: number): Promise<void>;
+  updateMeditationContent(id: number, content: string): Promise<Meditation>;
 }
 
 export class DatabaseStorage implements IStorage {
   // Create a new meditation
   async createMeditation(meditation: InsertMeditation & { content: string }): Promise<Meditation> {
-    // For development, return a mock meditation
+    // For development, store in memory
     if (process.env.NODE_ENV === 'development') {
       console.log("[MOCK] Creating meditation:", meditation.prompt);
-      return {
-        id: 1,
+      
+      // Create a mock meditation with the actual content
+      lastGeneratedMeditation = {
+        id: Date.now(), // Use timestamp for unique ID
         prompt: meditation.prompt,
-        content: meditation.content,
+        content: meditation.content, // Store the actual generated content
         rating: null,
         createdAt: new Date()
       };
+      
+      return lastGeneratedMeditation;
     }
     
     // Production code
@@ -36,9 +44,16 @@ export class DatabaseStorage implements IStorage {
 
   // Get a specific meditation by ID
   async getMeditation(id: number): Promise<Meditation | undefined> {
-    // For development, return a mock meditation
+    // For development, return the last generated meditation
     if (process.env.NODE_ENV === 'development') {
       console.log("[MOCK] Getting meditation:", id);
+      
+      // Return the last generated meditation regardless of ID in development
+      if (lastGeneratedMeditation) {
+        return lastGeneratedMeditation;
+      }
+      
+      // Fallback if nothing generated yet
       return {
         id: id,
         prompt: "Mock prompt",
@@ -60,15 +75,24 @@ export class DatabaseStorage implements IStorage {
   async listMeditations(): Promise<Meditation[]> {
     if (process.env.NODE_ENV === 'development') {
       console.log("[MOCK] Listing meditations");
-      return [{
+      
+      // Include the last generated meditation in the list if it exists
+      const mockMeditations = [{
         id: 1,
         prompt: "Mock prompt",
         content: "This is a mock meditation content for development.",
         rating: null,
-        createdAt: new Date()
+        createdAt: new Date(Date.now() - 86400000) // 1 day ago
       }];
+      
+      if (lastGeneratedMeditation) {
+        mockMeditations.unshift(lastGeneratedMeditation); // Add to beginning of array
+      }
+      
+      return mockMeditations;
     }
     
+    // Production code remains the same
     return db
       .select()
       .from(meditations)
@@ -106,6 +130,36 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(meditations)
       .where(eq(meditations.id, id));
+  }
+
+  // Update meditation content
+  async updateMeditationContent(id: number, content: string): Promise<Meditation> {
+    if (process.env.NODE_ENV === 'development') {
+      console.log("[MOCK] Updating meditation content:", id);
+      
+      // Update the last generated meditation if it exists
+      if (lastGeneratedMeditation && lastGeneratedMeditation.id === id) {
+        lastGeneratedMeditation.content = content;
+        return lastGeneratedMeditation;
+      }
+      
+      // Return a mock meditation
+      return {
+        id: id,
+        prompt: "Mock prompt",
+        content: content,
+        rating: null,
+        createdAt: new Date()
+      };
+    }
+    
+    // Production code
+    const [updated] = await db
+      .update(meditations)
+      .set({ content })
+      .where(eq(meditations.id, id))
+      .returning();
+    return updated;
   }
 }
 
