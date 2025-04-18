@@ -347,27 +347,28 @@ export function serveStatic(app: express.Express) {
             res.sendFile(basicJsFile);
           });
           
-          return;
+          // Don't return here, let the code continue
+          // return;  <- Remove this line
         } catch (err) {
           log(`Error creating assets directory or printing tree: ${err}`);
+          
+          // Handle /dist/index.js request when assets directory doesn't exist
+          app.get('/dist/index.js', (req, res) => {
+            log(`Creating fallback JavaScript file for ${req.path}`);
+            
+            // Create a simple JavaScript file that will at least load without errors
+            const fallbackJs = `
+              console.log("Loading fallback JavaScript file");
+              // Initialize the application with minimal functionality
+              window.addEventListener('DOMContentLoaded', () => {
+                document.body.innerHTML += '<div style="padding: 20px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; margin: 20px;">Application assets could not be loaded. Please check the build configuration.</div>';
+              });
+            `;
+            
+            res.set('Content-Type', 'application/javascript');
+            res.send(fallbackJs);
+          });
         }
-        
-        // Handle /dist/index.js request when assets directory doesn't exist
-        app.get('/dist/index.js', (req, res) => {
-          log(`Creating fallback JavaScript file for ${req.path}`);
-          
-          // Create a simple JavaScript file that will at least load without errors
-          const fallbackJs = `
-            console.log("Loading fallback JavaScript file");
-            // Initialize the application with minimal functionality
-            window.addEventListener('DOMContentLoaded', () => {
-              document.body.innerHTML += '<div style="padding: 20px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; margin: 20px;">Application assets could not be loaded. Please check the build configuration.</div>';
-            });
-          `;
-          
-          res.set('Content-Type', 'application/javascript');
-          res.send(fallbackJs);
-        });
       }
     } catch (err) {
       log(`Error reading directory: ${err}`);
