@@ -1,5 +1,5 @@
 import express, { type Express } from "express";
-import fs from "fs";
+import fs from 'fs';
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer, createLogger } from "vite";
@@ -70,26 +70,49 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-export function serveStatic(app: Express) {
+// Update the serveStatic function to handle missing files
+export function serveStatic(app: express.Express) {
   const clientDistPath = path.resolve(process.cwd(), 'dist');
   
-  // Serve static files with proper MIME types
-  app.use(express.static(clientDistPath, {
-    setHeaders: (res, filePath) => {
-      if (path.extname(filePath) === '.js') {
-        res.setHeader('Content-Type', 'application/javascript');
-      } else if (path.extname(filePath) === '.css') {
-        res.setHeader('Content-Type', 'text/css');
+  // Log the path we're trying to serve from
+  log(`Attempting to serve static files from: ${clientDistPath}`);
+  
+  // Check if the dist directory exists
+  if (fs.existsSync(clientDistPath)) {
+    app.use(express.static(clientDistPath, {
+      setHeaders: (res, filePath) => {
+        if (path.extname(filePath) === '.js') {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
       }
-    }
-  }));
-  
-  // Serve index.html for all routes not handled by API or static files
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(clientDistPath, 'index.html'));
-    }
-  });
-  
-  log(`Serving static files from ${clientDistPath}`);
+    }));
+    
+    // Serve index.html for client-side routing
+    app.get('*', (req, res, next) => {
+      if (!req.path.startsWith('/api')) {
+        const indexPath = path.join(clientDistPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          res.sendFile(indexPath);
+        } else {
+          log(`Warning: index.html not found at ${indexPath}`);
+          res.status(404).send('Application files not found. Please build the application first.');
+        }
+      } else {
+        next();
+      }
+    });
+    
+    log(`Static files being served from ${clientDistPath}`);
+  } else {
+    log(`Warning: Static files directory not found at ${clientDistPath}`);
+    
+    // Add a fallback route for non-API routes when dist doesn't exist
+    app.get('*', (req, res, next) => {
+      if (!req.path.startsWith('/api')) {
+        res.status(404).send('Application files not found. Please build the application first.');
+      } else {
+        next();
+      }
+    });
+  }
 }
