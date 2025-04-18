@@ -5,16 +5,22 @@ import { setupDatabase } from '../db-setup.js';
 import path from 'path';
 
 const app = express();
+// Add request logging middleware
+app.use((req, res, next) => {
+  log(`${req.method} ${req.url}`);
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Remove this middleware as it might be causing conflicts
-// app.use((req, res, next) => {
-//   if (req.path.endsWith('.js')) {
-//     res.type('application/javascript');
-//   }
-//   next();
-// });
+// Add explicit MIME type handling for JavaScript files
+app.use((req, res, next) => {
+  if (req.path.endsWith('.js')) {
+    res.type('application/javascript');
+  }
+  next();
+});
 
 // Remove this static file serving as it might conflict with serveStatic
 // if (app.get("env") !== "development") {
