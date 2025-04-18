@@ -121,17 +121,30 @@ export function serveStatic(app: express.Express) {
     } catch (err) {
       log(`Error reading directory: ${err}`);
     }
-    
-    // Fix: Use a more specific pattern for JavaScript files
+dd     
+    // Fix: Check multiple locations for JS files
     app.get('/dist/*.js', (req, res) => {
-      const jsPath = path.join(clientDistPath, req.path.replace('/dist/', ''));
-      log(`Serving JS file from: ${jsPath}`);
+      const requestedFile = req.path.replace('/dist/', '');
+      log(`Looking for JS file: ${requestedFile}`);
       
-      if (fs.existsSync(jsPath)) {
+      // Try multiple possible locations for the JS file
+      const possibleJsLocations = [
+        path.join(clientDistPath, requestedFile),                // server/public/index.js
+        path.join('/opt/render/project/src/dist', requestedFile), // dist/index.js
+        path.join(process.cwd(), 'dist', requestedFile),         // ./dist/index.js
+        path.join(clientDistPath, 'assets', requestedFile)       // server/public/assets/index.js
+      ];
+      
+      // Find the first location that exists
+      const jsPath = possibleJsLocations.find(p => fs.existsSync(p));
+      
+      if (jsPath) {
+        log(`Found JS file at: ${jsPath}`);
         res.set('Content-Type', 'application/javascript');
         res.sendFile(jsPath);
       } else {
-        log(`JS file not found: ${jsPath}`);
+        log(`JS file not found in any location: ${requestedFile}`);
+        log(`Tried: ${possibleJsLocations.join(', ')}`);
         res.status(404).send('File not found');
       }
     });
