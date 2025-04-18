@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "rm -rf server/public && vite build && mkdir -p server/public && cp -r dist/* server/public/ && mv server/public/assets server/public/_assets && mkdir -p server/public/assets && cp -r server/public/_assets/* server/public/assets/ && rm -rf server/public/_assets && cp setup-db.js server/public/ && node fix-csp.js && echo 'Final build structure:' && ls -R server/public",
+    "build": "rm -rf server/public && vite build && mkdir -p server/public && { [ -d dist ] && cp -r dist/* server/public/ || true; } && { [ -d server/public/assets ] && mv server/public/assets server/public/_assets || true; } && mkdir -p server/public/assets && { [ -d server/public/_assets ] && cp -r server/public/_assets/* server/public/assets/ || true; } && rm -rf server/public/_assets && cp setup-db.js server/public/ && node fix-csp.js && echo 'Final build structure:' && ls -R server/public",
     "migrate": "cd dist && node --experimental-modules migrate.js",
     "start": "node setup-db.js && node fix-csp.js && tsx server/index.ts",
     "check": "tsc",
