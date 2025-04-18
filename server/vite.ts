@@ -73,23 +73,26 @@ export async function setupVite(app: Express, server: Server) {
 // Update the serveStatic function to handle missing files
 // Update the serveStatic function to handle Render's environment
 export function serveStatic(app: express.Express) {
-  // Check multiple possible locations for the dist directory
+  // Check multiple possible locations for the static files directory
   const possiblePaths = [
     path.resolve(process.cwd(), 'dist'),
     path.resolve(process.cwd(), 'build'),
     '/opt/render/project/src/dist',
-    '/opt/render/project/dist'
+    '/opt/render/project/dist',
+    // Add the path where files are actually being built
+    '/opt/render/project/src/server/public',
+    path.resolve(process.cwd(), 'server/public')
   ];
   
   log(`Checking possible static file locations...`);
   
   // Log all possible paths and whether they exist
-  possiblePaths.forEach(path => {
-    log(`Checking path: ${path} - ${fs.existsSync(path) ? 'EXISTS' : 'NOT FOUND'}`);
+  possiblePaths.forEach(dirPath => {
+    log(`Checking path: ${dirPath} - ${fs.existsSync(dirPath) ? 'EXISTS' : 'NOT FOUND'}`);
   });
   
   // Find the first path that exists
-  const clientDistPath = possiblePaths.find(path => fs.existsSync(path));
+  const clientDistPath = possiblePaths.find(dirPath => fs.existsSync(dirPath));
   
   if (clientDistPath) {
     log(`Found static files at: ${clientDistPath}`);
@@ -98,19 +101,11 @@ export function serveStatic(app: express.Express) {
     try {
       const files = fs.readdirSync(clientDistPath);
       log(`Files in ${clientDistPath}: ${files.join(', ')}`);
-      
-      // Check if public directory exists
-      const publicPath = path.join(clientDistPath, 'public');
-      if (fs.existsSync(publicPath)) {
-        log(`Found public directory at: ${publicPath}`);
-        const publicFiles = fs.readdirSync(publicPath);
-        log(`Files in public directory: ${publicFiles.join(', ')}`);
-      }
     } catch (err) {
       log(`Error reading directory: ${err}`);
     }
     
-    // Serve static files from the dist directory
+    // Serve static files from the directory
     app.use(express.static(clientDistPath, {
       setHeaders: (res, filePath) => {
         if (path.extname(filePath) === '.js') {
@@ -119,28 +114,22 @@ export function serveStatic(app: express.Express) {
       }
     }));
     
-    // Also serve files from the public subdirectory if it exists
-    const publicPath = path.join(clientDistPath, 'public');
-    if (fs.existsSync(publicPath)) {
-      app.use(express.static(publicPath));
+    // Check for assets directory and serve it too
+    const assetsPath = path.join(clientDistPath, 'assets');
+    if (fs.existsSync(assetsPath)) {
+      log(`Found assets directory at: ${assetsPath}`);
+      app.use('/assets', express.static(assetsPath));
     }
     
     // Serve index.html for client-side routing
     app.get('*', (req, res, next) => {
       if (!req.path.startsWith('/api')) {
-        // First check for index.html in the root dist directory
-        let indexPath = path.join(clientDistPath, 'index.html');
-        
-        // If not found, check in the public subdirectory
-        if (!fs.existsSync(indexPath)) {
-          indexPath = path.join(clientDistPath, 'public', 'index.html');
-        }
-        
+        const indexPath = path.join(clientDistPath, 'index.html');
         if (fs.existsSync(indexPath)) {
           log(`Serving index.html from: ${indexPath}`);
           res.sendFile(indexPath);
         } else {
-          log(`Warning: index.html not found in any expected location`);
+          log(`Warning: index.html not found at ${indexPath}`);
           res.status(404).send('Application files not found. Please check build configuration.');
         }
       } else {
