@@ -3,9 +3,12 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupDatabase } from '../db-setup.js';
 import path from 'path';
+import { createServer } from 'http';
 
 const app = express();
-// Add request logging middleware
+const server = createServer(app);
+
+// Request logging middleware
 app.use((req, res, next) => {
   log(`${req.method} ${req.url}`);
   next();
@@ -14,25 +17,7 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Add explicit MIME type handling for JavaScript files
-app.use((req, res, next) => {
-  if (req.path.endsWith('.js')) {
-    res.type('application/javascript');
-  }
-  next();
-});
-
-// Remove this static file serving as it might conflict with serveStatic
-// if (app.get("env") !== "development") {
-//   app.use(express.static(path.join(process.cwd(), 'dist'), {
-//     setHeaders: (res, filePath) => {
-//       if (path.extname(filePath) === '.js') {
-//         res.setHeader('Content-Type', 'application/javascript');
-//       }
-//     }
-//   }));
-// }
-
+// API response logging
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -51,11 +36,6 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
       log(logLine);
     }
   });
@@ -63,46 +43,54 @@ app.use((req, res, next) => {
   next();
 });
 
+// Error handling middleware
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
+  log(`Error ${status}: ${message}`);
+});
+
 async function startServer() {
-  // Run database migrations/setup
   try {
     await setupDatabase();
   } catch (error) {
     console.error('Database setup error:', error);
-    // Continue even if database setup fails
   }
-  
-  const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  await registerRoutes(app);
 
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
-    // Let serveStatic handle all static file serving
-    serveStatic(app);
+    // Production static file serving
+    const staticDir = path.join(process.cwd(), 'server', 'public');
     
-    // Remove this as it's now handled in serveStatic
-    // app.get('*', (req, res) => {
-    //   res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
-    // });
+    // Serve static assets with proper caching
+    app.use('/assets', express.static(path.join(staticDir, 'assets'), {
+      maxAge: '1y',
+      immutable: true
+    }));
+
+    // Serve other static files
+    app.use(express.static(staticDir));
+
+    // Client-side routing fallback
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(staticDir, 'index.html'));
+    });
+
+    log(`Production static files served from: ${staticDir}`);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
   const PORT = process.env.PORT || 5001;
   server.listen(PORT, "0.0.0.0", () => {
-    log(`serving on port ${PORT}`);
+    log(`Server running on port ${PORT}`);
+    log(`NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
   });
 }
 
-startServer().catch(console.error);
+startServer().catch(err => {
+  console.error('Server startup error:', err);
+  process.exit(1);
+});

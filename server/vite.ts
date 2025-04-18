@@ -73,22 +73,12 @@ export async function setupVite(app: Express, server: Server) {
 
 // Production static file serving
 export function serveStatic(app: express.Express) {
-  // Find the first valid static files directory
-  const staticDir = STATIC_PATHS.find(dir => {
-    try {
-      return fs.existsSync(path.join(dir, 'index.html'));
-    } catch {
-      return false;
-    }
-  });
-
-  if (!staticDir) {
-    log("No static files directory found");
-    return;
-  }
-
-  log(`Serving static files from: ${staticDir}`);
+  const staticDir = path.join(process.cwd(), 'server', 'public');
   
+  // Debug logging
+  log('Static files directory:', staticDir);
+  log('Directory contents:', fs.readdirSync(staticDir).join(', '));
+
   // Verify assets directory
   const assetsDir = path.join(staticDir, 'assets');
   if (fs.existsSync(assetsDir)) {
@@ -129,11 +119,6 @@ export function serveStatic(app: express.Express) {
       return res.status(404).end();
     }
     
-    const indexPath = path.join(staticDir, 'index.html');
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).send('Application files not found');
-    }
+    res.sendFile(path.join(staticDir, 'index.html'));
   });
 }
