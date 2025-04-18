@@ -5,11 +5,10 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "mkdir -p dist && cp -r server dist/ && cp -r shared dist/ && cp -r db-setup.js dist/",
-    "start": "cd dist && node -e \"const { neon } = require('@neondatabase/serverless'); neon(process.env.DATABASE_URL)('ALTER TABLE meditations ADD COLUMN IF NOT EXISTS model TEXT').then(() => require('./server/index.js'))\"",
-    "check": "tsc",
-    "db:migrate": "tsx migrate.ts",
-    "prepare-deploy": "npm run db:migrate"
+    "build": "mkdir -p dist && cp -r server dist/ && cp -r shared dist/ && cp db-setup.js dist/ && cp migrate.js dist/",
+    "migrate": "cd dist && node --experimental-modules migrate.js",
+    "start": "npm run migrate || true && cd dist && node --experimental-modules server/index.js",
+    "check": "tsc"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
