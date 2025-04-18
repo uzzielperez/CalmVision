@@ -136,8 +136,19 @@ export function serveStatic(app: express.Express) {
         
         // Handle /dist/index.js request when assets directory doesn't exist
         app.get('/dist/index.js', (req, res) => {
-          log(`Cannot serve ${req.path}: Assets directory not found`);
-          res.status(404).send('Assets directory not found');
+          log(`Creating fallback JavaScript file for ${req.path}`);
+          
+          // Create a simple JavaScript file that will at least load without errors
+          const fallbackJs = `
+            console.log("Loading fallback JavaScript file");
+            // Initialize the application with minimal functionality
+            window.addEventListener('DOMContentLoaded', () => {
+              document.body.innerHTML += '<div style="padding: 20px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px; margin: 20px;">Application assets could not be loaded. Please check the build configuration.</div>';
+            });
+          `;
+          
+          res.set('Content-Type', 'application/javascript');
+          res.send(fallbackJs);
         });
       }
     } catch (err) {
@@ -251,24 +262,75 @@ export function serveStatic(app: express.Express) {
         
         // Read the index.html file and modify it to point to the correct JS file
         try {
+          // Log the content of index.html for debugging
+          const htmlContent = fs.readFileSync(indexPath, 'utf8');
+          log(`Index.html content preview: ${htmlContent.substring(0, 200)}...`);
+          
           const assetsPath = path.join(clientDistPath, 'assets');
           if (fs.existsSync(assetsPath)) {
             const assetFiles = fs.readdirSync(assetsPath);
+            log(`Available asset files: ${assetFiles.join(', ')}`);
+            
             const mainJsFile = assetFiles.find(file => file.endsWith('.js') && file.includes('index-'));
             
             if (mainJsFile) {
-              let htmlContent = fs.readFileSync(indexPath, 'utf8');
+              log(`Found main JS file: ${mainJsFile}`);
               
-              // Replace references to /dist/index.js with the correct path
-              if (htmlContent.includes('/dist/index.js')) {
+              // Check if index.html contains script tags and what they reference
+              const scriptTagMatch = htmlContent.match(/<script[^>]*src="([^"]*)"[^>]*>/g);
+              if (scriptTagMatch) {
+                log(`Script tags found: ${scriptTagMatch.join(', ')}`);
+              } else {
+                log(`No script tags found in index.html`);
+              }
+              
+              // Create a modified version of the HTML with the correct script path
+              let modifiedHtml = htmlContent;
+              
+              // Replace any references to /dist/index.js with the correct path
+              if (modifiedHtml.includes('/dist/index.js')) {
                 log(`Replacing /dist/index.js with /assets/${mainJsFile} in index.html`);
-                htmlContent = htmlContent.replace('/dist/index.js', `/assets/${mainJsFile}`);
+                modifiedHtml = modifiedHtml.replace('/dist/index.js', `/assets/${mainJsFile}`);
                 
                 // Send the modified HTML
                 res.set('Content-Type', 'text/html');
-                return res.send(htmlContent);
+                return res.send(modifiedHtml);
+              } else {
+                // If there's no direct reference to /dist/index.js, look for other script tags
+                // that might need to be updated
+                const scriptSrcRegex = /<script[^>]*src="([^"]*)"[^>]*>/g;
+                let match;
+                let scriptFound = false;
+                
+                while ((match = scriptSrcRegex.exec(htmlContent)) !== null) {
+                  const scriptSrc = match[1];
+                  log(`Found script with src: ${scriptSrc}`);
+                  
+                  // If we find a script that looks like it might be the main entry point
+                  if (scriptSrc.includes('index') || scriptSrc.includes('main') || scriptSrc.includes('bundle')) {
+                    log(`Replacing ${scriptSrc} with /assets/${mainJsFile}`);
+                    modifiedHtml = modifiedHtml.replace(scriptSrc, `/assets/${mainJsFile}`);
+                    scriptFound = true;
+                  }
+                }
+                
+                if (scriptFound) {
+                  // Send the modified HTML
+                  res.set('Content-Type', 'text/html');
+                  return res.send(modifiedHtml);
+                } else {
+                  // If we couldn't find any script tags to replace, add our own
+                  log(`Adding script tag for ${mainJsFile}`);
+                  modifiedHtml = modifiedHtml.replace('</head>', `<script type="module" src="/assets/${mainJsFile}"></script></head>`);
+                  res.set('Content-Type', 'text/html');
+                  return res.send(modifiedHtml);
+                }
               }
+            } else {
+              log(`No main JS file found in assets directory`);
             }
+          } else {
+            log(`Assets directory not found at: ${assetsPath}`);
           }
         } catch (err) {
           log(`Error modifying index.html: ${err}`);
