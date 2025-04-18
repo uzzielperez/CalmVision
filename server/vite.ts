@@ -72,16 +72,17 @@ export async function setupVite(app: Express, server: Server) {
 
 // Update the serveStatic function to handle missing files
 // Update the serveStatic function to handle Render's environment
+// Update the serveStatic function to prioritize the correct directory
 export function serveStatic(app: express.Express) {
   // Check multiple possible locations for the static files directory
   const possiblePaths = [
+    // Prioritize the path where files are actually being built
+    '/opt/render/project/src/server/public',
+    path.resolve(process.cwd(), 'server/public'),
     path.resolve(process.cwd(), 'dist'),
     path.resolve(process.cwd(), 'build'),
     '/opt/render/project/src/dist',
-    '/opt/render/project/dist',
-    // Add the path where files are actually being built
-    '/opt/render/project/src/server/public',
-    path.resolve(process.cwd(), 'server/public')
+    '/opt/render/project/dist'
   ];
   
   log(`Checking possible static file locations...`);
@@ -91,11 +92,29 @@ export function serveStatic(app: express.Express) {
     log(`Checking path: ${dirPath} - ${fs.existsSync(dirPath) ? 'EXISTS' : 'NOT FOUND'}`);
   });
   
-  // Find the first path that exists
-  const clientDistPath = possiblePaths.find(dirPath => fs.existsSync(dirPath));
+  // Find the first path that exists AND contains index.html
+  let clientDistPath = null;
+  for (const dirPath of possiblePaths) {
+    if (fs.existsSync(dirPath)) {
+      const indexPath = path.join(dirPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        clientDistPath = dirPath;
+        log(`Found index.html at: ${indexPath}`);
+        break;
+      } else {
+        log(`Directory exists but no index.html found at: ${indexPath}`);
+      }
+    }
+  }
+  
+  // If no path with index.html was found, use the first existing path
+  if (!clientDistPath) {
+    clientDistPath = possiblePaths.find(dirPath => fs.existsSync(dirPath));
+    log(`No directory with index.html found, using: ${clientDistPath}`);
+  }
   
   if (clientDistPath) {
-    log(`Found static files at: ${clientDistPath}`);
+    log(`Serving static files from: ${clientDistPath}`);
     
     // List files in the directory for debugging
     try {
