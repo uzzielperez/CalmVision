@@ -347,10 +347,7 @@ export function serveStatic(app: express.Express) {
             res.sendFile(basicJsFile);
           });
           
-          // Don't return here, let the code continue
-          // return;  <- Remove this line
-        } catch (err) {
-          log(`Error creating assets directory or printing tree: ${err}`);
+          // This closing brace is for the try block that started earlier
           
           // Handle /dist/index.js request when assets directory doesn't exist
           app.get('/dist/index.js', (req, res) => {
