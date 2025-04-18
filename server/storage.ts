@@ -77,7 +77,7 @@ export class DatabaseStorage implements IStorage {
       console.log("[MOCK] Listing meditations");
       
       // Include the last generated meditation in the list if it exists
-      const mockMeditations = [{
+      const mockMeditations: Meditation[] = [{
         id: 1,
         prompt: "Mock prompt",
         content: "This is a mock meditation content for development.",

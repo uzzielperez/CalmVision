@@ -8,6 +8,7 @@ export const meditations = pgTable("meditations", {
   prompt: text("prompt").notNull(),
   content: text("content"), //remove not null
   rating: integer("rating"), // Rating from 1-5
+  model: text("model"), // Add this line to store the model
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -16,9 +17,10 @@ export const meditationsRelations = relations(meditations, ({ many }) => ({}));
 
 // Only require prompt for insertion, content will be generated
 export const insertMeditationSchema = createInsertSchema(meditations)
-  .pick({ prompt: true })
+  .pick({ prompt: true, model: true })
   .extend({
     prompt: z.string().min(1, "Please enter a meditation prompt"),
+    model: z.string().optional(), // Make it optional
   });
 
 export const updateMeditationSchema = createInsertSchema(meditations)

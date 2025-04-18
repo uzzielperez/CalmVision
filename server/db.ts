@@ -1,74 +1,48 @@
 // At the top of db.ts
 import * as dotenv from 'dotenv';
 dotenv.config();
-import * as schema from "@shared/schema";
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
+import * as schema from "@shared/schema";
 
-// Use a mock database for development
-let db: any;
-
-if (process.env.NODE_ENV === 'development') {
-  // Use mock DB for development to avoid WebSocket issues
-  console.log("Using mock database for development");
-  
-  // Create a mock DB with the same interface
-  db = {
-    insert: () => ({ 
-      values: () => ({ 
-        returning: async () => [{ 
-          id: 1, 
-          prompt: 'Mock prompt', 
-          content: 'Mock meditation content', 
-          createdAt: new Date() 
-        }] 
-      }) 
-    }),
-    select: () => ({ 
-      from: () => ({ 
-        where: () => [{ 
-          id: 1, 
-          prompt: 'Mock prompt', 
-          content: 'Mock meditation content', 
-          createdAt: new Date() 
-        }],
-        orderBy: () => [{ 
-          id: 1, 
-          prompt: 'Mock prompt', 
-          content: 'Mock meditation content', 
-          createdAt: new Date() 
-        }] 
-      }) 
-    }),
-    update: () => ({ 
-      set: () => ({ 
-        where: () => ({ 
-          returning: async () => [{ 
-            id: 1, 
-            prompt: 'Mock prompt', 
-            content: 'Mock content', 
-            rating: 5, 
-            createdAt: new Date() 
-          }] 
-        }) 
-      }) 
-    }),
-    delete: () => ({ where: async () => null })
-  };
-} else {
-  // For production, use Neon
-  console.log("Using Neon PostgreSQL for production");
-  
-  // Import ws module
+// Only use WebSockets in production and make sure ws is properly loaded
+if (process.env.NODE_ENV === 'production') {
   try {
-    const ws = require('ws');
-    neonConfig.webSocketConstructor = ws;
+    // Dynamic import to handle module loading properly
+    import('ws').then(wsModule => {
+      neonConfig.webSocketConstructor = wsModule.default || wsModule;
+      console.log("WebSocket module loaded successfully for Neon database");
+    }).catch(err => {
+      console.error("Failed to load WebSocket module:", err);
+      // Fallback to HTTP
+      neonConfig.useSecureWebSocket = false;
+    });
   } catch (error) {
-    console.error("Failed to load ws module:", error);
+    console.error("Error setting up WebSocket:", error);
+    // Fallback to HTTP
+    neonConfig.useSecureWebSocket = false;
   }
-  
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  db = drizzle({ client: pool, schema });
+} else {
+  // For development, use mock database instead of real connection
+  console.log("Development mode: Not using WebSockets");
+  neonConfig.useSecureWebSocket = false;
+  neonConfig.webSocketConstructor = undefined;
 }
 
-export { db };
+// Make sure DATABASE_URL is set
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL must be set");
+}
+
+// Create the database pool with error handling
+let pool;
+try {
+  pool = new Pool({ connectionString: DATABASE_URL });
+  console.log("Database pool created successfully");
+} catch (error) {
+  console.error("Failed to create database pool:", error);
+  throw error;
+}
+
+export const db = drizzle({ client: pool, schema });

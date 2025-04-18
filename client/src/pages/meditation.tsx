@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
-import { History, PlusCircle } from "lucide-react";
+import { History, PlusCircle, Pencil } from "lucide-react";
 import { BlobAnimation } from "@/components/blob-animation";
 import { PlaybackControls } from "@/components/playback-controls";
 import { VoiceSelector } from "@/components/voice-selector";
@@ -26,6 +26,43 @@ interface VoicesResponse {
   voices: Voice[];
 }
 
+function cleanupTextForDisplay(text: string): string {
+  if (!text) return "";
+  
+  let cleaned = text
+    .replace(/\*\*\*(.*?)\*\*\*/g, '$1')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/`{1,3}.*?`{1,3}/g, '')
+    .replace(/^(Title:|Meditation:|Script:|Guide:).*?\n/i, '')
+    .replace(/^(Introduction:).*?\n/i, '')
+    .replace(/[_~`#>]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const lines = cleaned.split('\n');
+  let meaningfulContentStarted = false;
+  let result = [];
+  
+  for (const line of lines) {
+    if (!meaningfulContentStarted && line.trim() === '') continue;
+    
+    if (!meaningfulContentStarted && 
+        (line.includes('NOTE:') || 
+         line.includes('DURATION:') || 
+         line.includes('TIME:') ||
+         line.match(/^\d+[\.\)]/))) {
+      continue;
+    }
+    
+    meaningfulContentStarted = true;
+    result.push(line);
+  }
+  
+  return result.join('\n');
+}
+
 export default function Meditation() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
@@ -33,6 +70,8 @@ export default function Meditation() {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>();
   const [retryCount, setRetryCount] = useState(0);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState("");
 
   // Fetch meditation data
   const { data: meditation, isLoading: meditationLoading } = useQuery<MeditationResponse>({
@@ -124,6 +163,72 @@ export default function Meditation() {
     };
   }, [meditation, selectedVoiceId]);
 
+  // Add this computed value for the cleaned content
+  const cleanedContent = meditation?.content ? cleanupTextForDisplay(meditation.content) : '';
+  
+  // Handle editing
+  const handleEdit = () => {
+    setEditedContent(cleanedContent);
+    setIsEditing(true);
+  };
+  
+  const handleSave = async () => {
+    if (!id) return;
+    
+    try {
+      const response = await fetch(`/api/meditations/${id}/content`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: editedContent }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update meditation');
+      }
+      
+      // Update local state
+      setIsEditing(false);
+      
+      // Show success toast
+      toast({
+        title: "Meditation Updated",
+        description: "Your meditation has been updated successfully.",
+      });
+      
+      // Refresh data to get the updated content
+      window.location.reload();
+    } catch (error) {
+      console.error('Error saving meditation:', error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update meditation content. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Download meditation audio
+  const handleDownload = () => {
+    // Create a URL for the audio
+    const audioUrl = `/api/meditations/${id}/audio?voice_id=${selectedVoiceId}`;
+    
+    // Create an anchor and trigger download
+    const a = document.createElement('a');
+    a.href = audioUrl;
+    a.download = `meditation-${id}.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  useEffect(() => {
+    if (meditation) {
+      setEditedContent(meditation.content || "");
+    }
+  }, [meditation]);
+
   // Loading state
   if (meditationLoading || voicesLoading) {
     return (
@@ -193,6 +298,58 @@ export default function Meditation() {
           volume={audio.volume}
           onVolumeChange={audio.setVolume}
         />
+
+        {isEditing ? (
+          <div className="edit-modal">
+            <textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              rows={10}
+              className="w-full p-2 border rounded"
+            />
+            <div className="flex justify-end mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditing(false)} 
+                className="mr-2"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSave}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Card className="p-4 relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute top-2 right-2" 
+              onClick={handleEdit}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <CardContent className="p-0">
+              <div className="prose max-w-none pt-4">
+                <p>{cleanedContent}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {!isEditing && (
+          <Button 
+            variant="default"
+            onClick={handleDownload}
+            className="w-full mt-4"
+            disabled={!selectedVoiceId}
+          >
+            Download Audio
+          </Button>
+        )}
       </div>
     </div>
   );

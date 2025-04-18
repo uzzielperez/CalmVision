@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { History } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -9,16 +9,25 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { type Meditation } from "@shared/schema";
+import { ModelSelector } from "@/components/model-selector";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [selectedModel, setSelectedModel] = useState("llama3-70b-8192");
+
+  const { data: models } = useQuery<string[]>({
+    queryKey: ['/api/models'],
+  });
 
   const createMeditation = useMutation({
-    mutationFn: async (prompt: string) => {
-      const res = await apiRequest("POST", "/api/meditations", { prompt });
-      return res.json() as Promise<Meditation & { duration: number }>;
+    mutationFn: async ({ prompt }: { prompt: string }) => {
+      return apiRequest('/api/meditations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, model: selectedModel }),
+      });
     },
     onSuccess: (meditation) => {
       // Redirect to the meditation page after creation
@@ -44,7 +53,7 @@ export default function Home() {
     }
 
     try {
-      await createMeditation.mutateAsync(prompt);
+      await createMeditation.mutateAsync({ prompt });
     } catch (error) {
       console.error("Failed to create meditation:", error);
     }
@@ -82,6 +91,14 @@ export default function Home() {
                 onChange={(e) => setPrompt(e.target.value)}
                 className="text-lg"
               />
+
+              {models && models.length > 0 && (
+                <ModelSelector
+                  models={models}
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                />
+              )}
 
               <Button
                 onClick={handleSubmit}

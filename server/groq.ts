@@ -40,9 +40,9 @@ export async function listModels() {
   }
 }
 
-export async function generateMeditation(prompt: string) {
+export async function generateMeditation(prompt: string, model: string = "llama3-70b-8192") {
   try {
-    console.log(`Starting meditation generation for prompt: "${prompt}"`);
+    console.log(`Starting meditation generation for prompt: "${prompt}" using model: ${model}`);
     
     // Use fetch directly instead of the Groq client
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -52,11 +52,22 @@ export async function generateMeditation(prompt: string) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "llama3-70b-8192",
+        model: model,
         messages: [
           {
             role: "system",
-            content: "You are a meditation guide. Create calming and insightful meditation scripts."
+            content: `You are a meditation guide creating scripts to be read aloud. 
+            Follow these guidelines:
+            1. Provide ONLY the verbatim script that would be read aloud during the meditation
+            2. DO NOT include introductions, titles, notes, metadata, or durations
+            3. DO NOT use markdown formatting, asterisks, or other special characters
+            4. DO NOT number steps or sections
+            5. Use natural pauses in the text with line breaks where appropriate
+            6. Begin directly with the meditation guidance (e.g., "Close your eyes...", "Take a deep breath...")
+            7. Use plain, clear language designed for speaking
+            8. Avoid any text that isn't meant to be read aloud
+            
+            Your response should be the exact text a narrator would read, without any additional content.`
           },
           {
             role: "user",

@@ -68,16 +68,16 @@ export async function registerRoutes(app: Express) {
   // Create a new meditation
   app.post("/api/meditations", async (req, res) => {
     try {
-      const { prompt } = insertMeditationSchema.parse(req.body);
-      console.log('Received meditation prompt:', prompt);
+      const { prompt, model } = req.body;
+      console.log('Received meditation prompt:', prompt, 'with model:', model);
 
       // Log every step
       console.log('Generating meditation...');
       let generated;
       
       try {
-        // Try using your implementation
-        generated = await generateMeditation(prompt);
+        // Pass the model parameter
+        generated = await generateMeditation(prompt, model);
         console.log('Generated meditation content successfully, length:', generated.content.length);
       } catch (genError: any) {
         console.error('Specific generation error:', genError);
@@ -97,6 +97,7 @@ export async function registerRoutes(app: Express) {
       const meditation = await storage.createMeditation({
         prompt,
         content: truncatedContent,
+        model: model,
       });
       console.log('Saved to database, ID:', meditation.id);
 
@@ -279,6 +280,29 @@ export async function registerRoutes(app: Express) {
         message: 'Database test failed',
         error: error?.message || String(error)
       });
+    }
+  });
+
+  // Add this endpoint to update meditation content
+  app.patch("/api/meditations/:id/content", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+
+      const { content } = req.body;
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      // Update the content in storage
+      const meditation = await storage.updateMeditationContent(id, content);
+
+      res.json(meditation);
+    } catch (error) {
+      console.error('Failed to update meditation content:', error);
+      res.status(500).json({ error: "Failed to update meditation content" });
     }
   });
 
