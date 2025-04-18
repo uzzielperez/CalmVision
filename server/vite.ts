@@ -201,9 +201,83 @@ export function serveStatic(app: express.Express) {
       } else {
         log(`Assets directory not found at: ${assetsPath}`);
         
-        // Print a more comprehensive directory structure for debugging
-        log(`Printing comprehensive directory structure for debugging:`);
-        try {
+        // Try to find and copy build files from other locations
+        log(`Attempting to locate and copy build files to the expected location...`);
+        
+        // Define possible build locations to check
+        const possibleBuildLocations = [
+          path.join(process.cwd(), 'dist', 'assets'),
+          path.join(process.cwd(), 'build', 'assets'),
+          path.join(process.cwd(), 'client', 'dist', 'assets'),
+          path.join(process.cwd(), 'client', 'build', 'assets'),
+          path.join(process.cwd(), 'dist', 'public', 'assets'),
+          '/opt/render/project/src/dist/assets',
+          '/opt/render/project/dist/assets'
+        ];
+        
+        // Check each location for build files
+        let foundBuildFiles = false;
+        for (const buildPath of possibleBuildLocations) {
+          if (fs.existsSync(buildPath)) {
+            try {
+              const buildFiles = fs.readdirSync(buildPath);
+              log(`Found build files at: ${buildPath}`);
+              log(`Files: ${buildFiles.join(', ')}`);
+              
+              // Look for the JS and CSS files
+              const jsFile = buildFiles.find(file => file.endsWith('.js') && file.includes('index-'));
+              const cssFile = buildFiles.find(file => file.endsWith('.css') && file.includes('index-'));
+              
+              if (jsFile || cssFile) {
+                log(`Found build assets: JS=${jsFile || 'none'}, CSS=${cssFile || 'none'}`);
+                
+                // Create the assets directory if it doesn't exist
+                fs.mkdirSync(assetsPath, { recursive: true });
+                
+                // Copy the files to the expected location
+                if (jsFile) {
+                  const sourcePath = path.join(buildPath, jsFile);
+                  const destPath = path.join(assetsPath, jsFile);
+                  fs.copyFileSync(sourcePath, destPath);
+                  log(`Copied JS file from ${sourcePath} to ${destPath}`);
+                  
+                  // Set up a route to serve this file
+                  app.get('/dist/index.js', (req, res) => {
+                    log(`Serving copied JS file: ${jsFile}`);
+                    res.set('Content-Type', 'application/javascript');
+                    res.sendFile(path.join(assetsPath, jsFile));
+                  });
+                }
+                
+                if (cssFile) {
+                  const sourcePath = path.join(buildPath, cssFile);
+                  const destPath = path.join(assetsPath, cssFile);
+                  fs.copyFileSync(sourcePath, destPath);
+                  log(`Copied CSS file from ${sourcePath} to ${destPath}`);
+                  
+                  // Set up a route to serve this file
+                  app.get('/dist/index.css', (req, res) => {
+                    log(`Serving copied CSS file: ${cssFile}`);
+                    res.set('Content-Type', 'text/css');
+                    res.sendFile(path.join(assetsPath, cssFile));
+                  });
+                }
+                
+                foundBuildFiles = true;
+                break;
+              }
+            } catch (err) {
+              log(`Error accessing build path ${buildPath}: ${err}`);
+            }
+          }
+        }
+        
+        if (foundBuildFiles) {
+          log(`Successfully copied build files to the expected location`);
+        } else {
+          // Print directory tree for debugging if we couldn't find the build files
+          log(`Could not find build files in any expected location. Printing directory tree...`);
+          
           // Function to recursively list directories with more depth
           const listDir = (dir, depth = 0, maxDepth = 4) => {
             if (depth > maxDepth) {
