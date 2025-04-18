@@ -132,18 +132,11 @@ export function serveStatic(app: express.Express) {
             res.status(404).send('File not found');
           }
         });
-      }
         
         // Find the main JS file in assets
         const mainJsFile = assetFiles.find(file => file.endsWith('.js') && file.includes('index-'));
         if (mainJsFile) {
           log(`Found main JS file: ${mainJsFile}`);
-          
-          // Add a redirect for /dist/index.js to the actual file
-          app.get('/dist/index.js', (req, res) => {
-            log(`Redirecting /dist/index.js to /assets/${mainJsFile}`);
-            res.redirect(`/assets/${mainJsFile}`);
-          });
         }
       }
     } catch (err) {
