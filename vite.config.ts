@@ -21,6 +21,19 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "server", "public"),
     assetsDir: "assets",
     emptyOutDir: true,
+    manifest: true, // Generate manifest.json
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+      }
+    }
   },
   base: '/',
+  server: {
+    watch: {
+      usePolling: true, // Useful for some Docker/CI environments
+    }
+  }
 });
