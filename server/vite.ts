@@ -248,6 +248,33 @@ export function serveStatic(app: express.Express) {
       const indexPath = path.join(clientDistPath, 'index.html');
       if (fs.existsSync(indexPath)) {
         log(`Serving index.html for route: ${req.path}`);
+        
+        // Read the index.html file and modify it to point to the correct JS file
+        try {
+          const assetsPath = path.join(clientDistPath, 'assets');
+          if (fs.existsSync(assetsPath)) {
+            const assetFiles = fs.readdirSync(assetsPath);
+            const mainJsFile = assetFiles.find(file => file.endsWith('.js') && file.includes('index-'));
+            
+            if (mainJsFile) {
+              let htmlContent = fs.readFileSync(indexPath, 'utf8');
+              
+              // Replace references to /dist/index.js with the correct path
+              if (htmlContent.includes('/dist/index.js')) {
+                log(`Replacing /dist/index.js with /assets/${mainJsFile} in index.html`);
+                htmlContent = htmlContent.replace('/dist/index.js', `/assets/${mainJsFile}`);
+                
+                // Send the modified HTML
+                res.set('Content-Type', 'text/html');
+                return res.send(htmlContent);
+              }
+            }
+          }
+        } catch (err) {
+          log(`Error modifying index.html: ${err}`);
+        }
+        
+        // If we couldn't modify the HTML, just send the file as-is
         res.sendFile(indexPath);
       } else {
         log(`Warning: index.html not found at ${indexPath}`);
