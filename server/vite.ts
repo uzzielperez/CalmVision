@@ -70,21 +70,26 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-export function serveStatic(app: Express.Application) {
-  const publicDir = path.join(process.cwd(), 'server', 'public');
+export function serveStatic(app: Express) {
+  const clientDistPath = path.resolve(process.cwd(), 'dist');
   
-  if (!fs.existsSync(publicDir)) {
-    throw new Error(`Could not find the build directory: ${publicDir}, make sure to build the client first`);
-  }
+  // Serve static files with proper MIME types
+  app.use(express.static(clientDistPath, {
+    setHeaders: (res, filePath) => {
+      if (path.extname(filePath) === '.js') {
+        res.setHeader('Content-Type', 'application/javascript');
+      } else if (path.extname(filePath) === '.css') {
+        res.setHeader('Content-Type', 'text/css');
+      }
+    }
+  }));
   
-  // Add CSP headers
-  app.use((req, res, next) => {
-    res.setHeader(
-      'Content-Security-Policy',
-      "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss: https:;"
-    );
-    next();
+  // Serve index.html for all routes not handled by API or static files
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    }
   });
   
-  app.use(express.static(publicDir));
+  log(`Serving static files from ${clientDistPath}`);
 }
