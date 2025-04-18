@@ -248,37 +248,58 @@ function mapElevenLabsToOpenAI(elevenLabsVoiceId: string): string {
 
 // Function to list available voices
 export async function listVoices(): Promise<Array<{ id: string; name: string }>> {
+  console.log("Starting listVoices function...");
   let voices: Array<{ id: string; name: string }> = [];
-  let serviceAvailable = false;
   
-  // Add ElevenLabs voices if configured
+  // ALWAYS add these default voices regardless of API availability
+  const defaultVoices = [
+    { id: "default", name: "Default Voice" },
+    { id: "groq_playai-tts-arabic", name: "Arabic TTS (Groq)" },
+    { id: "openai_nova", name: "OpenAI Nova" },
+    { id: "21m00Tcm4TlvDq8ikWAM", name: "ElevenLabs Rachel" }
+  ];
+  
+  console.log("Adding default voices:", defaultVoices.length);
+  voices = [...defaultVoices];
+  
+  // Try to add ElevenLabs voices if configured
   if (process.env.ELEVENLABS_API_KEY) {
+    console.log("ElevenLabs API key found, attempting to fetch voices...");
     try {
-      console.log("Fetching ElevenLabs voices...");
       const response = await fetch('https://api.elevenlabs.io/v1/voices', {
         headers: {
           'xi-api-key': process.env.ELEVENLABS_API_KEY,
         },
       });
       
+      console.log("ElevenLabs API response status:", response.status);
+      
       if (response.ok) {
-        const data = await response.json();
-        if (data.voices && Array.isArray(data.voices)) {
-          const elevenLabsVoices = data.voices.map((voice: ElevenLabsVoice) => ({
-            id: voice.voice_id,
-            name: voice.name,
-          }));
-          voices.push(...elevenLabsVoices);
-          serviceAvailable = true;
-          console.log(`Found ${elevenLabsVoices.length} ElevenLabs voices`);
-        } else {
-          console.error('ElevenLabs response did not contain voices array:', data);
+        const responseText = await response.text();
+        console.log("ElevenLabs response received, length:", responseText.length);
+        
+        try {
+          const data = JSON.parse(responseText);
+          console.log("ElevenLabs data parsed, has voices:", !!data.voices);
+          
+          if (data.voices && Array.isArray(data.voices)) {
+            const elevenLabsVoices = data.voices.map((voice: ElevenLabsVoice) => ({
+              id: voice.voice_id,
+              name: voice.name,
+            }));
+            console.log(`Found ${elevenLabsVoices.length} ElevenLabs voices`);
+            voices.push(...elevenLabsVoices);
+          } else {
+            console.error('ElevenLabs response structure unexpected:', data);
+          }
+        } catch (parseError) {
+          console.error("Failed to parse ElevenLabs response:", parseError);
         }
       } else {
-        console.error('Failed to fetch ElevenLabs voices:', await response.text());
+        console.error('Failed to fetch ElevenLabs voices:', response.status, await response.text());
       }
     } catch (error) {
-      console.error("Failed to fetch ElevenLabs voices:", error);
+      console.error("Network error fetching ElevenLabs voices:", error);
     }
   } else {
     console.log("ElevenLabs API key not configured");
@@ -286,55 +307,41 @@ export async function listVoices(): Promise<Array<{ id: string; name: string }>>
   
   // Add OpenAI voices if configured
   if (process.env.OPENAI_API_KEY) {
-    try {
-      console.log("Adding OpenAI voices...");
-      const openaiVoices: OpenAIVoice[] = [
-        { id: "openai_alloy", name: "OpenAI Alloy" },
-        { id: "openai_echo", name: "OpenAI Echo" },
-        { id: "openai_fable", name: "OpenAI Fable" },
-        { id: "openai_onyx", name: "OpenAI Onyx" },
-        { id: "openai_nova", name: "OpenAI Nova" },
-        { id: "openai_shimmer", name: "OpenAI Shimmer" }
-      ];
-      voices.push(...openaiVoices);
-      serviceAvailable = true;
-      console.log(`Added ${openaiVoices.length} OpenAI voices`);
-    } catch (error) {
-      console.error("Failed to add OpenAI voices:", error);
-    }
+    console.log("OpenAI API key found, adding static voice list");
+    const openaiVoices: OpenAIVoice[] = [
+      { id: "openai_alloy", name: "OpenAI Alloy" },
+      { id: "openai_echo", name: "OpenAI Echo" },
+      { id: "openai_fable", name: "OpenAI Fable" },
+      { id: "openai_onyx", name: "OpenAI Onyx" },
+      { id: "openai_nova", name: "OpenAI Nova" },
+      { id: "openai_shimmer", name: "OpenAI Shimmer" }
+    ];
+    voices.push(...openaiVoices);
+    console.log(`Added ${openaiVoices.length} OpenAI voices`);
   } else {
     console.log("OpenAI API key not configured");
   }
   
   // Add Groq voices if configured
   if (process.env.GROQ_API_KEY) {
-    try {
-      console.log("Adding Groq voices...");
-      const groqVoices: GroqVoice[] = [
-        { id: "groq_playai-tts-arabic", name: "Arabic TTS (Groq)" },
-        // Add other Groq models if available
-      ];
-      voices.push(...groqVoices);
-      serviceAvailable = true;
-      console.log(`Added ${groqVoices.length} Groq voices`);
-    } catch (error) {
-      console.error("Failed to add Groq voices:", error);
-    }
+    console.log("Groq API key found, adding static voice list");
+    const groqVoices: GroqVoice[] = [
+      { id: "groq_playai-tts-arabic", name: "Arabic TTS (Groq)" },
+      { id: "groq_playai-tts-1", name: "Standard TTS (Groq)" }
+    ];
+    voices.push(...groqVoices);
+    console.log(`Added ${groqVoices.length} Groq voices`);
   } else {
     console.log("Groq API key not configured");
   }
   
-  // If no services available, add fallback voices
-  if (!serviceAvailable || voices.length === 0) {
-    console.log("No TTS services available or no voices found, adding fallback voices");
-    voices = [
-      { id: "default", name: "Default Voice" },
-      { id: "groq_playai-tts-arabic", name: "Arabic TTS (Groq)" },
-      { id: "openai_nova", name: "OpenAI Nova" },
-      { id: "21m00Tcm4TlvDq8ikWAM", name: "ElevenLabs Rachel" }
-    ];
-  }
-  
   console.log(`Total voices available: ${voices.length}`);
-  return voices;
+  
+  // Deduplicate voices by ID
+  const uniqueVoices = Array.from(
+    new Map(voices.map(voice => [voice.id, voice])).values()
+  );
+  console.log(`After deduplication: ${uniqueVoices.length} voices`);
+  
+  return uniqueVoices;
 }
