@@ -201,31 +201,55 @@ export function serveStatic(app: express.Express) {
       } else {
         log(`Assets directory not found at: ${assetsPath}`);
         
-        // Print directory tree for debugging
-        log(`Printing directory tree for debugging:`);
+        // Print a more comprehensive directory structure for debugging
+        log(`Printing comprehensive directory structure for debugging:`);
         try {
-          // Function to recursively list directories
-          const listDir = (dir, depth = 0) => {
-            const indent = '  '.repeat(depth);
+          // Function to recursively list directories with more depth
+          const listDir = (dir, depth = 0, maxDepth = 4) => {
+            if (depth > maxDepth) {
+              log(`${' '.repeat(depth * 2)}... (max depth reached)`);
+              return;
+            }
+            
+            const indent = ' '.repeat(depth * 2);
             log(`${indent}${path.basename(dir)}/`);
             
-            const items = fs.readdirSync(dir);
-            for (const item of items) {
-              const itemPath = path.join(dir, item);
-              const stats = fs.statSync(itemPath);
-              
-              if (stats.isDirectory()) {
-                listDir(itemPath, depth + 1);
-              } else {
-                log(`${indent}  ${item}`);
+            try {
+              const items = fs.readdirSync(dir);
+              for (const item of items) {
+                const itemPath = path.join(dir, item);
+                try {
+                  const stats = fs.statSync(itemPath);
+                  
+                  if (stats.isDirectory()) {
+                    listDir(itemPath, depth + 1, maxDepth);
+                  } else {
+                    // For JS and CSS files, show more details
+                    if (item.endsWith('.js') || item.endsWith('.css')) {
+                      const sizeKb = Math.round(stats.size / 1024 * 100) / 100;
+                      log(`${indent}  ${item} (${sizeKb} KB)`);
+                    } else {
+                      log(`${indent}  ${item}`);
+                    }
+                  }
+                } catch (err) {
+                  log(`${indent}  Error accessing ${itemPath}: ${err.message}`);
+                }
               }
+            } catch (err) {
+              log(`${indent}Error reading directory ${dir}: ${err.message}`);
             }
           };
           
-          // Start from the parent directory to see the full structure
-          const parentDir = path.dirname(clientDistPath);
-          log(`Starting directory tree from: ${parentDir}`);
-          listDir(parentDir);
+          // Start from multiple possible locations to find the build files
+          log(`Starting directory tree from project root:`);
+          listDir(process.cwd(), 0);
+          
+          // Also check the render-specific paths
+          if (fs.existsSync('/opt/render/project')) {
+            log(`Starting directory tree from Render project root:`);
+            listDir('/opt/render/project', 0);
+          }
           
           // Create assets directory and basic JS file if it doesn't exist
           log(`Creating assets directory and basic JS file`);
