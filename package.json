@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "vite build --outDir server/public && cp -r server dist/ && cp -r shared dist/ && cp setup-db.js dist/",
+    "build": "vite build --outDir server/public && cp -r shared server/public/shared && cp setup-db.js server/public/ && cp fix-csp.js server/public/",
     "migrate": "cd dist && node --experimental-modules migrate.js",
     "start": "node setup-db.js && node fix-csp.js && tsx server/index.ts",
     "check": "tsc",
