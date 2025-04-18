@@ -1,5 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -26,3 +28,10 @@ async function setupDatabase() {
 }
 
 setupDatabase();
+
+// Make sure public directory exists
+const publicDir = path.join(process.cwd(), 'server', 'public');
+if (!fs.existsSync(publicDir)) {
+  console.log('Creating public directory:', publicDir);
+  fs.mkdirSync(publicDir, { recursive: true });
+}
